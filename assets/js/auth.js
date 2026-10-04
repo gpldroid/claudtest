@@ -1,0 +1,5 @@
+import{client}from"./config.js";
+const message=document.querySelector("#authMessage"),login=document.querySelector("#githubLogin"),logout=document.querySelector("#logout");
+login?.addEventListener("click",async()=>{message.textContent="جارٍ تحويلك إلى GitHub…";const{error}=await client.auth.signInWithOAuth({provider:"github",options:{redirectTo:new URL("dashboard/",location.href).href,scopes:"read:user user:email repo"}});if(error)message.textContent=error.message});
+logout?.addEventListener("click",async()=>{await client.auth.signOut();message.textContent="تم تسجيل الخروج.";logout.classList.add("hidden");login.classList.remove("hidden")});
+const{data:{session}}=await client.auth.getSession();if(session){message.textContent="تم تسجيل الدخول.";login.classList.add("hidden");logout.classList.remove("hidden")}
