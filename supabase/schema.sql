@@ -299,15 +299,31 @@ drop policy if exists profiles_update_own on public.profiles;
 create policy profiles_select_own on public.profiles
 for select to authenticated
 using ((select auth.uid()) = id);
+create or replace function app_private.protect_profile_limits()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $
+begin
+  if new.plan <> old.plan
+     or new.max_projects <> old.max_projects
+     or new.max_builds_per_day <> old.max_builds_per_day then
+    raise exception 'PROFILE_LIMITS_READ_ONLY';
+  end if;
+  return new;
+end;
+$;
+
+drop trigger if exists profiles_protect_limits on public.profiles;
+create trigger profiles_protect_limits
+before update on public.profiles
+for each row execute function app_private.protect_profile_limits();
+
 create policy profiles_update_own on public.profiles
 for update to authenticated
 using ((select auth.uid()) = id)
-with check (
-  (select auth.uid()) = id
-  and plan = 'free'
-  and max_projects = (select p.max_projects from public.profiles p where p.id = (select auth.uid()))
-  and max_builds_per_day = (select p.max_builds_per_day from public.profiles p where p.id = (select auth.uid()))
-);
+with check ((select auth.uid()) = id);
 
 -- Projects: complete ownership isolation.
 alter table public.projects enable row level security;
