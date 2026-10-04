@@ -167,8 +167,6 @@ android {
 }
 
 dependencies {
-    implementation("androidx.core:core:1.19.1")
-    implementation("androidx.core:core-splashscreen:1.2.0")
 }
 `,
     "app/proguard-rules.pro": `# WebView uses Android framework APIs and does not require blanket keep rules.
@@ -208,7 +206,6 @@ import android.content.Intent
 import android.graphics.Color
 import android.net.Uri
 import android.os.Bundle
-import android.view.View
 import android.webkit.CookieManager
 import android.webkit.DownloadListener
 import android.webkit.SslErrorHandler
@@ -321,6 +318,14 @@ class MainActivity : Activity() {
         webView.setDownloadListener(DownloadListener { url, _, _, _, _ ->
             openExternal(Uri.parse(url))
         })
+
+        if (android.os.Build.VERSION.SDK_INT >= 33) {
+            onBackInvokedDispatcher.registerOnBackInvokedCallback(
+                android.window.OnBackInvokedDispatcher.PRIORITY_DEFAULT
+            ) {
+                if (webView.canGoBack()) webView.goBack() else finish()
+            }
+        }
 
         if (savedInstanceState == null) {
             webView.loadUrl(startUrl)
