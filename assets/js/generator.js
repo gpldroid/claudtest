@@ -220,13 +220,8 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.webkit.ValueCallback
 import android.widget.Toast
-import androidx.activity.ComponentActivity
-import androidx.activity.enableEdgeToEdge
-import androidx.core.content.ContextCompat
-import androidx.core.view.WindowInsetsCompat
-import androidx.core.view.ViewCompat
 
-class MainActivity : ComponentActivity() {
+class MainActivity : Activity() {
     private lateinit var webView: WebView
     private var filePathCallback: ValueCallback<Array<Uri>>? = null
     private val startUrl = "${url}"
@@ -235,17 +230,14 @@ class MainActivity : ComponentActivity() {
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
         window.statusBarColor = Color.TRANSPARENT
         window.navigationBarColor = Color.TRANSPARENT
 
         webView = WebView(this)
         webView.setBackgroundColor(Color.WHITE)
         setContentView(webView)
-
-        ViewCompat.setOnApplyWindowInsetsListener(webView) { view, insets ->
-            val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
-            view.setPadding(bars.left, bars.top, bars.right, bars.bottom)
+        webView.setOnApplyWindowInsetsListener { view, insets ->
+            view.setPadding(insets.systemWindowInsetLeft, insets.systemWindowInsetTop, insets.systemWindowInsetRight, insets.systemWindowInsetBottom)
             insets
         }
 
@@ -262,7 +254,9 @@ class MainActivity : ComponentActivity() {
         settings.builtInZoomControls = false
         settings.displayZoomControls = false
         settings.mediaPlaybackRequiresUserGesture = true
-        settings.safeBrowsingEnabled = true
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+            settings.safeBrowsingEnabled = true
+        }
         settings.userAgentString = settings.userAgentString + " Web2APK/${config.versionName}"
 
         CookieManager.getInstance().setAcceptCookie(true)
@@ -361,8 +355,13 @@ class MainActivity : ComponentActivity() {
         super.onSaveInstanceState(outState)
     }
 
+    @Suppress("DEPRECATION")
     override fun onBackPressed() {
-        if (webView.canGoBack()) webView.goBack() else super.onBackPressed()
+        if (android.os.Build.VERSION.SDK_INT >= 33) {
+            if (webView.canGoBack()) webView.goBack() else finish()
+        } else {
+            if (webView.canGoBack()) webView.goBack() else super.onBackPressed()
+        }
     }
 
     override fun onDestroy() {
@@ -393,10 +392,24 @@ class MainActivity : ComponentActivity() {
 <resources>
     <style name="Theme.Web2Apk" parent="android:style/Theme.Material.Light.NoActionBar">
         <item name="android:fontFamily">sans</item>
-        <item name="android:windowLightStatusBar">false</item>
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>
-        <item name="android:windowActionModeOverlay">true</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowBackground">@color/splash_background</item>
+    </style>
+</resources>
+`,
+    "app/src/main/res/values-v31/styles.xml": `<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.Web2Apk" parent="android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:fontFamily">sans</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowBackground">@color/splash_background</item>
+        <item name="android:windowSplashScreenBackground">@color/splash_background</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@mipmap/ic_launcher</item>
+        <item name="android:windowSplashScreenAnimationDuration">300</item>
     </style>
 </resources>
 `,
@@ -405,25 +418,8 @@ class MainActivity : ComponentActivity() {
     <base-config cleartextTrafficPermitted="false" />
 </network-security-config>
 `,
-    "app/src/main/res/values/themes.xml": `<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <style name="Theme.Web2Apk.Splash" parent="Theme.SplashScreen">
-        <item name="windowSplashScreenBackground">@color/splash_background</item>
-        <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher</item>
-        <item name="postSplashScreenTheme">@style/Theme.Web2Apk</item>
-    </style>
-</resources>
-`,
-    "app/src/main/res/drawable/splash_text.xml": `<?xml version="1.0" encoding="utf-8"?>
-<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <item android:gravity="center">
-        <shape android:shape="rectangle">
-            <solid android:color="@color/splash_background" />
-            <corners android:radius="24dp" />
-        </shape>
-    </item>
-</layer-list>
-`,
+
+
     "app/src/main/res/drawable/ic_launcher_foreground.png": { base64: iconPngs.foreground },
     "app/src/main/res/mipmap-mdpi/ic_launcher.png": { base64: iconPngs.mdpi },
     "app/src/main/res/mipmap-hdpi/ic_launcher.png": { base64: iconPngs.hdpi },
