@@ -232,7 +232,25 @@ class MainActivity : Activity() {
 
         webView = WebView(this)
         webView.setBackgroundColor(Color.WHITE)
-        setContentView(webView)
+
+        val root = FrameLayout(this)
+        root.setBackgroundColor(Color.WHITE)
+        root.addView(webView, FrameLayout.LayoutParams(
+            FrameLayout.LayoutParams.MATCH_PARENT,
+            FrameLayout.LayoutParams.MATCH_PARENT
+        ))
+
+        val splash = TextView(this)
+        splash.text = splashText
+        splash.setTextColor(Color.WHITE)
+        splash.textSize = 28f
+        splash.gravity = Gravity.CENTER
+        splash.setBackgroundColor(Color.parseColor("${color}"))
+        root.addView(splash, FrameLayout.LayoutParams(
+            FrameLayout.LayoutParams.MATCH_PARENT,
+            FrameLayout.LayoutParams.MATCH_PARENT
+        ))
+        setContentView(root)
         webView.setOnApplyWindowInsetsListener { view, insets ->
             view.setPadding(insets.systemWindowInsetLeft, insets.systemWindowInsetTop, insets.systemWindowInsetRight, insets.systemWindowInsetBottom)
             insets
@@ -332,6 +350,11 @@ class MainActivity : Activity() {
         } else {
             webView.restoreState(savedInstanceState)
         }
+        Handler(Looper.getMainLooper()).postDelayed({
+            splash.animate().alpha(0f).setDuration(180L).withEndAction {
+                root.removeView(splash)
+            }.start()
+        }, 420L)
     }
 
     private fun openExternal(uri: Uri): Boolean {
