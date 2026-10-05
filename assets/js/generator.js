@@ -220,12 +220,17 @@ android {
     namespace = "${escapeKotlin(config.package)}"
     compileSdk = 36
 
+    buildFeatures {
+        buildConfig = true
+    }
+
     defaultConfig {
         applicationId = "${escapeKotlin(config.package)}"
         minSdk = 23
         targetSdk = 36
         versionCode = injectedVersionCode.get()
         versionName = injectedVersionName.get()
+        buildConfigField("boolean", "WEB2APK_DEV_TOOLS", "${config.devTools}")
     }
 
     signingConfigs {
@@ -311,8 +316,10 @@ import android.app.Activity
 import android.content.Intent
 import android.graphics.Color
 import android.net.Uri
+import android.util.Log
 import android.os.Bundle
 import android.webkit.CookieManager
+import android.webkit.ConsoleMessage
 import android.webkit.DownloadListener
 import android.webkit.SslErrorHandler
 import android.webkit.WebChromeClient
@@ -340,6 +347,10 @@ class MainActivity : Activity() {
         super.onCreate(savedInstanceState)
         window.statusBarColor = Color.TRANSPARENT
         window.navigationBarColor = Color.TRANSPARENT
+
+        val debugToolsEnabled = BuildConfig.WEB2APK_DEV_TOOLS &&
+            (applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0
+        if (debugToolsEnabled) WebView.setWebContentsDebuggingEnabled(true)
 
         webView = WebView(this)
         webView.setBackgroundColor(Color.WHITE)
@@ -427,6 +438,11 @@ class MainActivity : Activity() {
         }
 
         webView.webChromeClient = object : WebChromeClient() {
+            override fun onConsoleMessage(message: ConsoleMessage): Boolean {
+                Log.d("WebViewConsole", "${message.message()} -- ${message.messageLevel()} -- line ${message.lineNumber()} -- ${message.sourceId()}")
+                return true
+            }
+
             override fun onShowFileChooser(
                 view: WebView,
                 callback: ValueCallback<Array<Uri>>,
@@ -732,6 +748,7 @@ form?.addEventListener("submit", async (event) => {
     splash: get("splashText"),
     versionName: get("versionName") || "1.0.0",
     versionCode: Number(get("versionCode") || "1"),
+    devTools: form.querySelector("#devTools")?.checked !== false,
     permissions: [...form.querySelectorAll('input[type="checkbox"]:checked')].map((input) => input.value)
   };
 
