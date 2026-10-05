@@ -1,4 +1,4 @@
-import { client } from "./config.js";
+import { client, getGitHubProviderToken } from "./config.js";
 
 const form = document.querySelector("#generatorForm");
 const message = document.querySelector("#generatorMessage");
@@ -926,10 +926,9 @@ form?.addEventListener("submit", async (event) => {
     message.textContent = "سجّل الدخول عبر GitHub أولاً حتى نتمكن من إنشاء المستودع وبدء البناء.";
     return;
   }
-  const { data: { session } } = await client.auth.getSession();
-  const githubToken = session?.provider_token || "";
+  const githubToken = await getGitHubProviderToken();
   if (!githubToken) {
-    message.textContent = "انتهت صلاحية اتصال GitHub. أعد تسجيل الدخول باستخدام GitHub ثم حاول مرة أخرى.";
+    message.innerHTML = 'لا يوجد اتصال GitHub صالح لهذه الجلسة. <a href="login.html?next=generator.html">أعد ربط GitHub</a> ثم حاول مرة أخرى.';
     return;
   }
 
