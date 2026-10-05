@@ -10,21 +10,21 @@
 <header><a class="brand" href="../index.html">◈ Web2APK</a><nav><a href="index.html">الرئيسية</a><a href="projects.html">المشاريع</a></nav></header>
 <main class="narrow panel">
 <h1>إعدادات الحساب</h1>
-<p class="muted">إعداد توقيع APK/AAB يتم عبر GitHub Actions. الأسرار لا تُحفظ في Web2APK أو قاعدة البيانات.</p>
+<p class="muted">إعداد توقيع APK/AAB يتم عبر GitHub Repository Secrets. القيم الحساسة لا تُحفظ في Web2APK أو Supabase ولا تُعرض بعد الحفظ.</p>
 <form id="signingForm">
 <label>المشروع
 <select id="projectSelect" required><option>جارٍ التحميل…</option></select>
 </label>
 <label>Keystore بصيغة Base64
-<textarea id="keystoreBase64" rows="5" required autocomplete="off"></textarea>
+<input id="keystoreBase64" type="password" required autocomplete="new-password" spellcheck="false">
 </label>
 <label>كلمة مرور keystore
 <input id="storePassword" type="password" required autocomplete="new-password"></label>
-<label>Alias
+<label>Alias (اسم المفتاح فقط، وليس كلمة المرور)
 <input id="keyAlias" required autocomplete="off"></label>
 <label>كلمة مرور المفتاح
 <input id="keyPassword" type="password" required autocomplete="new-password"></label>
-<button class="btn primary" type="submit">حفظ أسرار التوقيع</button>
+<button class="btn primary" type="submit">حفظ في GitHub Secrets</button>
 </form>
 <p id="settingsMessage" role="status"></p>
 <button id="signOut" class="btn">تسجيل الخروج</button>
