@@ -97,6 +97,8 @@ const appIconPreview = document.querySelector("#appIconPreview");
 let detectedIconDataUrl = "";
 let appNameManuallyEdited = false;
 let metadataTimer = null;
+let metadataRequestId = 0;
+let previewUrl = "";
 
 const packageInput = document.querySelector("#packageId");
 const packageAutoButton = document.querySelector("#generatePackageId");
@@ -143,11 +145,13 @@ updateGeneratedPackageId();
 
 async function analyzeSite() {
   const url = get("siteUrl");
+  const requestId = ++metadataRequestId;
   if (!validUrl(url)) return;
   if (metadataStatus) metadataStatus.textContent = "جارٍ تحليل الموقع واكتشاف الاسم والأيقونة…";
   try {
     const { data, error } = await client.functions.invoke("site-metadata", { body: { url } });
     if (error || !data?.ok) throw new Error(data?.error || "metadata_failed");
+    if (requestId !== metadataRequestId || get("siteUrl") !== url) return;
     if (!appNameManuallyEdited && data.name) appNameInput.value = data.name.slice(0, 50);
     detectedIconDataUrl = typeof data.iconDataUrl === "string" ? data.iconDataUrl : "";
     if (appIconPreview) {
@@ -159,7 +163,7 @@ async function analyzeSite() {
       appIconInput.title = data.iconUrl ? "تم اكتشاف أيقونة الموقع تلقائياً." : "";
     }
     updateGeneratedPackageId();
-    updateWebAppViewer(data.finalUrl || url);
+    updateWebAppViewer(url);
     if (metadataStatus) metadataStatus.textContent = data.iconUrl
       ? "تم اكتشاف اسم الموقع والأيقونة ومعرّف الحزمة تلقائياً."
       : "تم اكتشاف اسم الموقع ومعرّف الحزمة. لم تُكتشف أيقونة.";
@@ -175,6 +179,7 @@ const previewOpen = document.querySelector("#previewOpen");
 
 function updateWebAppViewer(forcedUrl = "") {
   const value = forcedUrl || get("siteUrl");
+  previewUrl = value;
   if (!previewFrame || !previewEmpty || !previewOpen) return;
   if (!validUrl(value)) {
     previewFrame.removeAttribute("src");
@@ -185,13 +190,14 @@ function updateWebAppViewer(forcedUrl = "") {
   }
   previewFrame.src = value;
   previewEmpty.hidden = true;
-  previewOpen.href = value;
+  previewOpen.href = previewUrl;
+  previewOpen.target = "_blank";
   previewOpen.removeAttribute("aria-disabled");
 }
 
-document.querySelector("#siteUrl")?.addEventListener("input", updateWebAppViewer);
-document.querySelector("#siteUrl")?.addEventListener("change", updateWebAppViewer);
-document.querySelector("#siteUrl")?.addEventListener("blur", updateWebAppViewer);
+document.querySelector("#siteUrl")?.addEventListener("input", () => updateWebAppViewer(get("siteUrl")));
+document.querySelector("#siteUrl")?.addEventListener("change", () => updateWebAppViewer(get("siteUrl")));
+document.querySelector("#siteUrl")?.addEventListener("blur", () => updateWebAppViewer(get("siteUrl")));
 updateWebAppViewer();
 
 const safePermissionNames = new Set([
