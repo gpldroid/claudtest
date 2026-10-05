@@ -23,6 +23,31 @@ const validPackage = (value) =>
   /^(?:[a-zA-Z][a-zA-Z0-9_]*)(?:\.[a-zA-Z][a-zA-Z0-9_]*){1,30}$/.test(value) &&
   value.length <= 150;
 
+function packageSegment(value) {
+  return String(value ?? "")
+    .normalize("NFKD")
+    .replace(/[\\u0300-\\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9_]+/g, "")
+    .replace(/^[^a-z]+/, "")
+    .slice(0, 40);
+}
+
+function generatePackageId(urlValue, appName) {
+  try {
+    const hostname = new URL(urlValue).hostname.toLowerCase().replace(/^www\\./, "");
+    const domainParts = hostname.split(".").filter(Boolean).map(packageSegment).filter(Boolean);
+    const appParts = appName.normalize("NFKD").replace(/[\\u0300-\\u036f]/g, "")
+      .split(/[^A-Za-z0-9_]+/).map(packageSegment).filter(Boolean);
+    if (domainParts.length < 2) return "";
+    const domain = domainParts.slice(-3);
+    const suffix = appParts.join("").slice(0, 30);
+    return [...domain, suffix || "app"].filter(Boolean).slice(-4).join(".").slice(0, 150);
+  } catch {
+    return "";
+  }
+}
+
 const validUrl = (value) => {
   try {
     const url = new URL(value);
@@ -31,6 +56,30 @@ const validUrl = (value) => {
     return false;
   }
 };
+
+const packageInput = document.querySelector("#packageId");
+const packageAutoButton = document.querySelector("#generatePackageId");
+const packageHint = document.querySelector("#packageIdHint");
+let packageManuallyEdited = false;
+
+function updateGeneratedPackageId(force = false) {
+  if (!packageInput || (!force && packageManuallyEdited)) return;
+  const generated = generatePackageId(get("siteUrl"), get("appName"));
+  if (!generated || !validPackage(generated)) return;
+  packageInput.value = generated;
+  if (packageHint) packageHint.textContent = "تم توليده تلقائياً من رابط الموقع واسم التطبيق. يمكنك تعديله يدوياً.";
+}
+
+packageInput?.addEventListener("input", () => {
+  packageManuallyEdited = true;
+  if (packageHint) packageHint.textContent = "معرّف مخصص. اضغط «توليد تلقائياً» للعودة إلى الاقتراح الذكي.";
+});
+document.querySelector("#siteUrl")?.addEventListener("input", () => updateGeneratedPackageId());
+document.querySelector("#appName")?.addEventListener("input", () => updateGeneratedPackageId());
+packageAutoButton?.addEventListener("click", () => {
+  packageManuallyEdited = false;
+  updateGeneratedPackageId(true);
+});
 
 const safePermissionNames = new Set([
   "CAMERA",
@@ -634,6 +683,7 @@ zipStorePath=wrapper/dists
 form?.addEventListener("submit", async (event) => {
   event.preventDefault();
 
+  updateGeneratedPackageId();
   const config = {
     url: get("siteUrl"),
     name: get("appName"),
