@@ -521,8 +521,6 @@ captures/
     ".github/workflows/android-build.yml": `name: Build Android
 
 on:
-  push:
-    branches: ["main"]
   workflow_dispatch:
     inputs:
       build_type:
@@ -703,28 +701,59 @@ form?.addEventListener("submit", async (event) => {
   setTimeout(() => URL.revokeObjectURL(href), 1000);
 
   const { data: { user } } = await client.auth.getUser();
-  if (user) {
-    const { error } = await client.from("projects").insert({
-      user_id: user.id,
-      name: config.name,
-      url: config.url,
-      package: config.package,
-      version_name: config.versionName,
-      version_code: config.versionCode,
-      settings: {
-        icon: config.icon,
-        primaryColor: config.primary,
-        splashText: config.splash,
-        permissions: config.permissions
-      },
-      config,
-      status: "draft"
-    });
-
-    message.textContent = error
-      ? `تم تنزيل ZIP، لكن تعذر حفظ المشروع: ${error.message}`
-      : "تم إنشاء مشروع Android وتنزيل ZIP وحفظ إعداداته.";
-  } else {
-    message.textContent = "تم إنشاء مشروع Android وتنزيل ZIP. سجّل الدخول لحفظ المشروع في لوحة التحكم.";
+  if (!user) {
+    message.textContent = "سجّل الدخول عبر GitHub أولاً حتى نتمكن من إنشاء المستودع وبدء البناء.";
+    return;
   }
+
+  const { data: { session } } = await client.auth.getSession();
+  const githubToken = session?.provider_token || "";
+  if (!githubToken) {
+    message.textContent = "انتهت صلاحية اتصال GitHub. أعد تسجيل الدخول باستخدام GitHub ثم حاول مرة أخرى.";
+    return;
+  }
+
+  const { data: project, error: projectError } = await client.from("projects").insert({
+    user_id: user.id,
+    name: config.name,
+    url: config.url,
+    package: config.package,
+    version_name: config.versionName,
+    version_code: config.versionCode,
+    settings: {
+      icon: config.icon,
+      primaryColor: config.primary,
+      splashText: config.splash,
+      permissions: config.permissions
+    },
+    config,
+    status: "draft"
+  }).select("id").single();
+
+  if (projectError || !project) {
+    message.textContent = "تعذر حفظ المشروع في قاعدة البيانات.";
+    return;
+  }
+
+  message.textContent = "تم حفظ المشروع. جارٍ إنشاء مستودع GitHub وبدء البناء…";
+
+  const { data: provision, error: provisionError } = await client.functions.invoke("github-actions", {
+    body: {
+      action: "provision_project",
+      projectId: project.id,
+      files,
+      githubToken,
+      buildType: "debug",
+      versionName: config.versionName,
+      versionCode: config.versionCode
+    }
+  });
+
+  if (provisionError || !provision?.ok) {
+    message.textContent = "تعذر إنشاء مستودع GitHub أو بدء عملية البناء.";
+    return;
+  }
+
+  message.textContent = "تم إنشاء مستودع GitHub وبدء بناء APK تجريبي. يمكنك متابعة الحالة من لوحة التحكم.";
+
 });
