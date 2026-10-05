@@ -224,6 +224,7 @@ async function init() {
     context = await getBuildContext();
     if (actionsLink) actionsLink.href = context.build.run_url || "#";
     await poll();
+    if (!resultsEl?.classList.contains("hidden") || !errorEl?.classList.contains("hidden")) return;
 
     timer = setInterval(() => {
       countdown -= 1;
