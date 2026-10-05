@@ -2,8 +2,13 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import sodium from "npm:libsodium-wrappers@0.7.15";
 
+const ALLOWED_ORIGIN = "https://gpldroid.github.io";
+const corsFor = (req: Request) => ({
+  ...cors,
+  "Access-Control-Allow-Origin": ALLOWED_ORIGIN,
+  ...(req.headers.get("Origin") === ALLOWED_ORIGIN ? { Vary: "Origin" } : {}),
+});
 const cors = {
-  "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
@@ -13,8 +18,8 @@ const allowedSecrets = new Set([
   "ANDROID_KEY_ALIAS",
   "ANDROID_KEY_PASSWORD",
 ]);
-const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), {
-  status, headers: { ...cors, "Content-Type": "application/json" },
+const json = (body: unknown, status = 200, req?: Request) => new Response(JSON.stringify(body), {
+  status, headers: { ...corsFor(req ?? new Request("https://gpldroid.github.io")), "Content-Type": "application/json" },
 });
 const validRepo = (value: string) => /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(value);
 const validUuid = (value: unknown) => typeof value === "string" && /^[0-9a-fA-F-]{36}$/.test(value);
@@ -27,7 +32,7 @@ const base64Utf8 = (value: string) => {
 };
 
 Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
+  if (req.method === "OPTIONS") return new Response("ok", { headers: corsFor(req) });
   if (req.method !== "POST") return json({ error: "method_not_allowed" }, 405);
   const auth = req.headers.get("Authorization") ?? "";
   if (!auth.startsWith("Bearer ")) return json({ error: "unauthorized" }, 401);
