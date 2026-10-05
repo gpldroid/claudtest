@@ -82,7 +82,7 @@ Deno.serve(async (req) => {
     if (!["debug", "release", "both"].includes(buildType)) return json({ error: "invalid_build_type" }, 400);
     const versionName = body.versionName || project.version_name;
     const versionCode = Number(body.versionCode || project.version_code);
-    if (!/^\\d+\\.\\d+\\.\\d+(?:[-+][0-9A-Za-z.-]+)?$/.test(versionName) || versionName.length > 30) {
+    if (!/^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$/.test(versionName) || versionName.length > 30) {
       return json({ error: "invalid_version_name" }, 400);
     }
     if (!Number.isInteger(versionCode) || versionCode < 1 || versionCode > 2100000000) {
