@@ -166,6 +166,49 @@ Deno.serve(async (req) => {
     return json({ ok: true, action: "provision_project", projectId: project.id, repo: fullName, buildId: build.id, runId: dispatch.workflow_run_id, runUrl: dispatch.html_url || dispatch.run_url || null });
   }
 
+  if (body.action === "set_secrets") {
+    if (!validUuid(body.projectId)) return json({ error: "invalid_project_id" }, 400);
+    const { data: project, error: projectError } = await supabase
+      .from("projects")
+      .select("id,repo_full_name")
+      .eq("id", body.projectId)
+      .maybeSingle();
+    if (projectError || !project?.repo_full_name || !validRepo(project.repo_full_name)) {
+      return json({ error: "project_access_denied" }, 403);
+    }
+    if (body.repo && body.repo !== project.repo_full_name) {
+      return json({ error: "project_repo_mismatch" }, 403);
+    }
+    const [owner, repo] = project.repo_full_name.split("/");
+    const repoCheck = await fetch(`https://api.github.com/repos/${owner}/${repo}`, { headers: ghHeaders });
+    if (!repoCheck.ok) return json({ error: "github_repo_access_denied" }, repoCheck.status === 404 ? 404 : 403);
+
+    const entries = Object.entries(body.secrets ?? {});
+    if (entries.length !== 4 || entries.some(([name, value]) => !allowedSecrets.has(name) || !value || value.length > 49152)) {
+      return json({ error: "invalid_secret" }, 400);
+    }
+    const keyResponse = await fetch(`https://api.github.com/repos/${owner}/${repo}/actions/secrets/public-key`, { headers: ghHeaders });
+    if (!keyResponse.ok) return json({ error: "github_public_key_failed" }, keyResponse.status);
+    const publicKey = await keyResponse.json();
+    await sodium.ready;
+    const keyBytes = sodium.from_base64(publicKey.key, sodium.base64_variants.ORIGINAL);
+    const results: string[] = [];
+    for (const [name, value] of entries) {
+      const encrypted = sodium.crypto_box_seal(new TextEncoder().encode(value), keyBytes);
+      const response = await fetch(`https://api.github.com/repos/${owner}/${repo}/actions/secrets/${name}`, {
+        method: "PUT",
+        headers: ghHeaders,
+        body: JSON.stringify({
+          encrypted_value: sodium.to_base64(encrypted, sodium.base64_variants.ORIGINAL),
+          key_id: publicKey.key_id,
+        }),
+      });
+      if (!response.ok) return json({ error: "github_secret_write_failed", secret: name }, response.status);
+      results.push(name);
+    }
+    return json({ ok: true, action: "set_secrets", secrets: results });
+  }
+
   if (!body.repo || !validRepo(body.repo)) return json({ error: "invalid_repo" }, 400);
   const [owner, repo] = body.repo.split("/");
   const repoCheck = await fetch(`https://api.github.com/repos/${owner}/${repo}`, { headers: ghHeaders });
@@ -233,35 +276,6 @@ Deno.serve(async (req) => {
       runUrl: dispatch.html_url || dispatch.run_url || null,
     });
   }
-
-  if (body.action === "set_secrets") {
-    const entries = Object.entries(body.secrets ?? {});
-    if (!entries.length || entries.length > 4) return json({ error: "invalid_secret_count" }, 400);
-    if (entries.some(([name, value]) => !allowedSecrets.has(name) || !value || value.length > 49152)) {
-      return json({ error: "invalid_secret" }, 400);
-    }
-    const keyResponse = await fetch(`https://api.github.com/repos/${owner}/${repo}/actions/secrets/public-key`, { headers: ghHeaders });
-    if (!keyResponse.ok) return json({ error: "github_public_key_failed" }, keyResponse.status);
-    const publicKey = await keyResponse.json();
-    await sodium.ready;
-    const keyBytes = sodium.from_base64(publicKey.key, sodium.base64_variants.ORIGINAL);
-    const results: string[] = [];
-    for (const [name, value] of entries) {
-      const encrypted = sodium.crypto_box_seal(new TextEncoder().encode(value), keyBytes);
-      const response = await fetch(`https://api.github.com/repos/${owner}/${repo}/actions/secrets/${name}`, {
-        method: "PUT",
-        headers: ghHeaders,
-        body: JSON.stringify({
-          encrypted_value: sodium.to_base64(encrypted, sodium.base64_variants.ORIGINAL),
-          key_id: publicKey.key_id,
-        }),
-      });
-      if (!response.ok) return json({ error: "github_secret_write_failed", secret: name }, response.status);
-      results.push(name);
-    }
-    return json({ ok: true, action: "set_secrets", secrets: results });
-  }
-
 
   if (body.action === "sync_build") {
     if (!validUuid(body.buildId) || !validUuid(body.projectId) || !body.repo || !validRepo(body.repo)) {
