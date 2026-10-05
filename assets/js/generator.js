@@ -33,16 +33,48 @@ function packageSegment(value) {
     .slice(0, 40);
 }
 
+function packageHash(value) {
+  let hash = 2166136261;
+  for (const char of String(value ?? "")) {
+    hash ^= char.codePointAt(0);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0).toString(36).padStart(7, "0").slice(0, 7);
+}
+
+function registrableDomainParts(hostname) {
+  const parts = hostname.split(".").filter(Boolean).map(packageSegment).filter(Boolean);
+  if (parts.length < 2) return [];
+  const last = parts[parts.length - 1];
+  const secondLast = parts[parts.length - 2];
+  const commonSecondLevel = new Set(["co", "com", "net", "org", "gov", "ac"]);
+  if (last.length === 2 && commonSecondLevel.has(secondLast) && parts.length >= 3) {
+    return parts.slice(-3);
+  }
+  return parts.slice(-2);
+}
+
 function generatePackageId(urlValue, appName) {
   try {
-    const hostname = new URL(urlValue).hostname.toLowerCase().replace(/^www\./, "");
-    const domainParts = hostname.split(".").filter(Boolean).map(packageSegment).filter(Boolean);
-    const appParts = appName.normalize("NFKD").replace(/[\u0300-\u036f]/g, "")
-      .split(/[^A-Za-z0-9_]+/).map(packageSegment).filter(Boolean);
+    const parsed = new URL(urlValue);
+    const hostname = parsed.hostname.toLowerCase().replace(/^www\./, "");
+    const domainParts = registrableDomainParts(hostname);
+    const appParts = String(appName ?? "")
+      .normalize("NFKD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .split(/[^A-Za-z0-9_]+/)
+      .map(packageSegment)
+      .filter(Boolean);
     if (domainParts.length < 2) return "";
-    const domain = domainParts.slice(-3);
-    const suffix = appParts.join("").slice(0, 30);
-    return [...domain, suffix || "app"].filter(Boolean).slice(-4).join(".").slice(0, 150);
+
+    const domain = domainParts.reverse();
+    const suffix = appParts.join("").slice(0, 24);
+    const stableHash = packageHash(`${parsed.origin.toLowerCase()}|${String(appName ?? "").trim().toLowerCase()}`);
+    return [...domain, suffix || "app", stableHash]
+      .filter(Boolean)
+      .slice(0, 5)
+      .join(".")
+      .slice(0, 150);
   } catch {
     return "";
   }
