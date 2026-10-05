@@ -1,4 +1,4 @@
-import { client, getGitHubProviderToken } from "./config.js";
+import { client, getGitHubProviderToken } from "./config.js?v=20261005-1";
 
 const form = document.querySelector("#generatorForm");
 const message = document.querySelector("#generatorMessage");
