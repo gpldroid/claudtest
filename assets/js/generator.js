@@ -963,23 +963,7 @@ form?.addEventListener("submit", async (event) => {
   }
 
   const files = buildFiles(config, iconPngs);
-  const zip = new JSZip();
-
-  for (const [path, body] of Object.entries(files)) {
-    if (typeof body === "object" && body.base64) {
-      zip.file(path, body.base64, { base64: true });
-    } else {
-      zip.file(path, body);
-    }
-  }
-
-  const blob = await zip.generateAsync({ type: "blob", compression: "DEFLATE" });
-  const href = URL.createObjectURL(blob);
-  const anchor = document.createElement("a");
-  anchor.href = href;
-  anchor.download = `${config.package.replace(/\./g, "-")}-android.zip`;
-  anchor.click();
-  setTimeout(() => URL.revokeObjectURL(href), 1000);
+  message.textContent = "تم تجهيز ملفات المشروع. جارٍ إنشاء مستودع GitHub وبدء البناء…";
 
   const { data: project, error: projectError } = await client.from("projects").insert({
     user_id: user.id,
