@@ -1,4 +1,4 @@
-import { client, SUPABASE_URL, SUPABASE_KEY } from "./config.js";
+import { client, SUPABASE_URL, SUPABASE_KEY, getGitHubProviderToken } from "./config.js";
 
 const msg = document.querySelector("#dashboardMessage");
 const list = document.querySelector("#projectsList");
@@ -8,10 +8,7 @@ const esc = (s) =>
     "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
   }[c]));
 
-const githubToken = async () => {
-  const { data: { session } } = await client.auth.getSession();
-  return session?.provider_token || "";
-};
+const githubToken = () => getGitHubProviderToken();
 
 async function syncBuild(buildId, projectId, repo) {
   const token = await githubToken();

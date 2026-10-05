@@ -1,4 +1,4 @@
-import { client } from "../assets/js/config.js";
+import { client, getGitHubProviderToken } from "../assets/js/config.js";
 
 const message = document.querySelector("#settingsMessage");
 const projectSelect = document.querySelector("#projectSelect");
@@ -8,10 +8,7 @@ const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({
   "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
 }[c]));
 
-async function githubToken() {
-  const { data: { session } } = await client.auth.getSession();
-  return session?.provider_token || "";
-}
+const githubToken = () => getGitHubProviderToken();
 
 async function loadProjects() {
   const { data: { user } } = await client.auth.getUser();
