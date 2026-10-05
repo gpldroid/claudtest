@@ -54,8 +54,13 @@ form?.addEventListener("submit", async (event) => {
     message.textContent = "قيمة keystore Base64 غير صالحة.";
     return;
   }
-  const selected = projectSelect.selectedOptions[0]?.textContent || "";
-  const repo = selected.split(" — ").slice(-1)[0];
+  const { data: project, error: projectError } = await client.from("projects")
+    .select("repo_full_name").eq("id", projectId).single();
+  const repo = project?.repo_full_name || "";
+  if (projectError || !repo) {
+    message.textContent = "تعذر التحقق من مستودع المشروع.";
+    return;
+  }
   message.textContent = "جارٍ تشفير الأسرار وإرسالها مباشرة إلى GitHub Actions…";
   const { data, error } = await client.functions.invoke("github-actions", {
     body: {
