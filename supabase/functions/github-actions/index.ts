@@ -35,6 +35,11 @@ Deno.serve(async (req) => {
   const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY")!, {
     global: { headers: { Authorization: auth } },
   });
+  const secretKeys = JSON.parse(Deno.env.get("SUPABASE_SECRET_KEYS") || "{}");
+  const supabaseAdmin = createClient(
+    Deno.env.get("SUPABASE_URL")!,
+    secretKeys.default || Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+  );
   const { data: { user }, error: userError } = await supabase.auth.getUser(auth.slice(7));
   if (userError || !user) return json({ error: "unauthorized" }, 401);
 
@@ -103,7 +108,7 @@ Deno.serve(async (req) => {
     }
     const projectUpdate = await supabase.from("projects").update({ repo: fullName, repo_full_name: fullName, status: "building" }).eq("id", project.id);
     if (projectUpdate.error) return json({ error: "project_update_failed" }, 500);
-    const { data: build, error: buildError } = await supabase.from("builds").insert({ project_id: project.id, status: "queued", version: project.version_name + " (" + project.version_code + ")" }).select("id").single();
+    const { data: build, error: buildError } = await supabaseAdmin.from("builds").insert({ project_id: project.id, status: "queued", version: project.version_name + " (" + project.version_code + ")" }).select("id").single();
     if (buildError || !build) return json({ error: "build_create_failed" }, 500);
     const buildType = body.buildType || "both";
     const versionName = body.versionName || project.version_name;
@@ -113,12 +118,12 @@ Deno.serve(async (req) => {
       body: JSON.stringify({ ref: "main", inputs: { build_type: buildType, version_name: versionName, version_code: String(versionCode) } }),
     });
     if (!dispatchResponse.ok) {
-      await supabase.from("builds").update({ status: "failed", conclusion: "dispatch_failed", finished_at: new Date().toISOString() }).eq("id", build.id);
-      await supabase.from("projects").update({ status: "failed" }).eq("id", project.id);
+      await supabaseAdmin.from("builds").update({ status: "failed", conclusion: "dispatch_failed", finished_at: new Date().toISOString() }).eq("id", build.id);
+      await supabaseAdmin.from("projects").update({ status: "failed" }).eq("id", project.id);
       return json({ error: "github_dispatch_failed" }, dispatchResponse.status);
     }
     const dispatch = await dispatchResponse.json();
-    const buildUpdate = await supabase.from("builds").update({ run_id: dispatch.workflow_run_id, run_url: dispatch.html_url || dispatch.run_url || null }).eq("id", build.id);
+    const buildUpdate = await supabaseAdmin.from("builds").update({ run_id: dispatch.workflow_run_id, run_url: dispatch.html_url || dispatch.run_url || null }).eq("id", build.id);
     if (buildUpdate.error) return json({ error: "build_update_failed" }, 500);
     return json({ ok: true, action: "provision_project", projectId: project.id, repo: fullName, buildId: build.id, runId: dispatch.workflow_run_id, runUrl: dispatch.html_url || dispatch.run_url || null });
   }
@@ -191,9 +196,9 @@ Deno.serve(async (req) => {
       started_at: run.run_started_at || null,
       finished_at: run.completed_at || null,
     };
-    const { error: updateError } = await supabase.from("builds").update(update).eq("id", build.id);
+    const { error: updateError } = await supabaseAdmin.from("builds").update(update).eq("id", build.id);
     if (updateError) return json({ error: "build_update_failed" }, 500);
-    await supabase.from("projects").update({ status: status === "success" ? "ready" : status === "failed" ? "failed" : "building" }).eq("id", project.id);
+    await supabaseAdmin.from("projects").update({ status: status === "success" ? "ready" : status === "failed" ? "failed" : "building" }).eq("id", project.id);
     return json({ ok: true, action: "sync_build", build: { ...build, ...update } });
   }
 
