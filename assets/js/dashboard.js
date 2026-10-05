@@ -99,10 +99,10 @@ async function downloadArtifact(buildId, repo, artifactId, button) {
     if (!window.JSZip) throw new Error("zip_decoder_unavailable");
 
     const zip = await window.JSZip.loadAsync(archive);
-    const candidates = Object.keys(zip.files).filter((name) => /\\.(apk|aab)$/i.test(name) && !zip.files[name].dir);
+    const candidates = Object.keys(zip.files).filter((name) => /\.(apk|aab)$/i.test(name) && !zip.files[name].dir);
     if (!candidates.length) throw new Error("apk_aab_missing");
 
-    const preferred = candidates.find((name) => /web2apk-(debug|release)\\.(apk|aab)$/i.test(name)) || candidates[0];
+    const preferred = candidates.find((name) => /web2apk-(debug|release)\.(apk|aab)$/i.test(name)) || candidates[0];
     const file = zip.files[preferred];
     const blob = await file.async("blob");
     const filename = preferred.split("/").pop();
