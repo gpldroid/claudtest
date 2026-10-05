@@ -76,6 +76,92 @@ Deno.serve(async (req) => {
     return json({ ok: true, action: "set_secrets", secrets: results });
   }
 
+
+  if (body.action === "list_artifacts" || body.action === "download_artifact") {
+    if (!body.buildId || typeof body.buildId !== "string" || !/^[0-9a-fA-F-]{36}$/.test(body.buildId)) {
+      return json({ error: "invalid_build_id" }, 400);
+    }
+
+    const { data: build, error: buildError } = await supabase
+      .from("builds")
+      .select("id,project_id,run_id,status,conclusion,artifact_ids")
+      .eq("id", body.buildId)
+      .maybeSingle();
+    if (buildError || !build) return json({ error: "build_not_found" }, 404);
+    if (!build.run_id) return json({ error: "build_run_not_ready" }, 409);
+
+    const { data: project, error: projectError } = await supabase
+      .from("projects")
+      .select("id,repo_full_name,repo")
+      .eq("id", build.project_id)
+      .maybeSingle();
+    if (projectError || !project || !project.repo_full_name) {
+      return json({ error: "project_not_found" }, 404);
+    }
+    if (project.repo_full_name !== body.repo) return json({ error: "repo_mismatch" }, 403);
+
+    const artifactsResponse = await fetch(
+      `https://api.github.com/repos/${owner}/${repo}/actions/runs/${build.run_id}/artifacts?per_page=100`,
+      { headers: ghHeaders },
+    );
+    if (!artifactsResponse.ok) {
+      return json(
+        { error: artifactsResponse.status === 404 ? "artifact_expired_or_missing" : "github_artifacts_failed" },
+        artifactsResponse.status === 404 ? 410 : artifactsResponse.status,
+      );
+    }
+
+    const artifactPayload = await artifactsResponse.json();
+    const artifacts = Array.isArray(artifactPayload.artifacts)
+      ? artifactPayload.artifacts.filter((artifact: any) => !artifact.expired)
+      : [];
+
+    if (body.action === "list_artifacts") {
+      return json({
+        ok: true,
+        buildId: build.id,
+        status: build.status,
+        conclusion: build.conclusion,
+        artifacts: artifacts.map((artifact: any) => ({
+          id: artifact.id,
+          name: artifact.name,
+          sizeInBytes: artifact.size_in_bytes,
+          expired: artifact.expired,
+          createdAt: artifact.created_at,
+          expiresAt: artifact.expires_at,
+        })),
+      });
+    }
+
+    if (!body.artifactId || !/^\\d+$/.test(String(body.artifactId))) {
+      return json({ error: "invalid_artifact_id" }, 400);
+    }
+    const artifactId = Number(body.artifactId);
+    const artifact = artifacts.find((item: any) => item.id === artifactId);
+    if (!artifact) return json({ error: "artifact_expired_or_missing" }, 410);
+
+    const downloadResponse = await fetch(
+      `https://api.github.com/repos/${owner}/${repo}/actions/artifacts/${artifactId}/zip`,
+      { headers: ghHeaders },
+    );
+    if (!downloadResponse.ok || !downloadResponse.body) {
+      return json(
+        { error: downloadResponse.status === 404 ? "artifact_expired_or_missing" : "github_artifact_download_failed" },
+        downloadResponse.status === 404 ? 410 : downloadResponse.status,
+      );
+    }
+
+    return new Response(downloadResponse.body, {
+      status: 200,
+      headers: {
+        ...cors,
+        "Content-Type": "application/zip",
+        "Content-Disposition": `attachment; filename="web2apk-${artifactId}.zip"`,
+        "Cache-Control": "private, no-store",
+      },
+    });
+  }
+
   if (body.action === "dispatch") {
     const workflow = body.workflow || "android-build.yml";
     const ref = body.ref || "main";
