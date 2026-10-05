@@ -712,16 +712,43 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p dist
-          find app/build/outputs/apk -type f -name "*.apk" -exec cp {} dist/ \;
-          find app/build/outputs/bundle -type f -name "*.aab" -exec cp {} dist/ \;
+          if [[ "${BUILD_TYPE:-both}" == "debug" || "${BUILD_TYPE:-both}" == "both" ]]; then
+            debug_apk=$(find app/build/outputs/apk/debug -type f -name "*.apk" -print -quit)
+            test -n "$debug_apk"
+            cp "$debug_apk" dist/web2apk-debug.apk
+          fi
+          if [[ "${BUILD_TYPE:-both}" == "release" || "${BUILD_TYPE:-both}" == "both" ]]; then
+            release_apk=$(find app/build/outputs/apk/release -type f -name "*.apk" -print -quit)
+            release_aab=$(find app/build/outputs/bundle/release -type f -name "*.aab" -print -quit)
+            test -n "$release_apk"
+            test -n "$release_aab"
+            cp "$release_apk" dist/web2apk-release.apk
+            cp "$release_aab" dist/web2apk-release.aab
+          fi
           test -n "$(find dist -type f -print -quit)"
           for file in dist/*; do sha256sum "$file" | tee "$file.sha256"; done
-      - name: Upload artifacts
+      - name: Upload debug APK
+        if: env.BUILD_TYPE == 'debug' || env.BUILD_TYPE == 'both'
         uses: actions/upload-artifact@v7
         with:
-          name: web2apk-${{ github.run_number }}-${{ github.sha }}
-          path: dist/*
-          if-no-files-found: error
+          path: dist/web2apk-debug.apk
+          archive: false
+          retention-days: 14
+
+      - name: Upload release APK
+        if: env.BUILD_TYPE == 'release' || env.BUILD_TYPE == 'both'
+        uses: actions/upload-artifact@v7
+        with:
+          path: dist/web2apk-release.apk
+          archive: false
+          retention-days: 14
+
+      - name: Upload release AAB
+        if: env.BUILD_TYPE == 'release' || env.BUILD_TYPE == 'both'
+        uses: actions/upload-artifact@v7
+        with:
+          path: dist/web2apk-release.aab
+          archive: false
           retention-days: 14
 `,
     "gradle/wrapper/gradle-wrapper.properties": `distributionBase=GRADLE_USER_HOME
