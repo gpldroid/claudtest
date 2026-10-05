@@ -78,8 +78,36 @@ Deno.serve(async (req) => {
     const { data: project, error: projectError } = await supabase.from("projects").select("id,name,version_name,version_code,repo_full_name").eq("id", body.projectId).maybeSingle();
     if (projectError || !project) return json({ error: "project_not_found" }, 404);
     if (project.repo_full_name) return json({ error: "project_already_provisioned" }, 409);
+    const buildType = body.buildType || "debug";
+    if (!["debug", "release", "both"].includes(buildType)) return json({ error: "invalid_build_type" }, 400);
+    const versionName = body.versionName || project.version_name;
+    const versionCode = Number(body.versionCode || project.version_code);
+    if (!/^\\d+\\.\\d+\\.\\d+(?:[-+][0-9A-Za-z.-]+)?$/.test(versionName) || versionName.length > 30) {
+      return json({ error: "invalid_version_name" }, 400);
+    }
+    if (!Number.isInteger(versionCode) || versionCode < 1 || versionCode > 2100000000) {
+      return json({ error: "invalid_version_code" }, 400);
+    }
+
+    const { data: build, error: buildError } = await supabaseAdmin.from("builds").insert({
+      project_id: project.id,
+      status: "queued",
+      version: versionName + " (" + versionCode + ")",
+    }).select("id").single();
+    if (buildError || !build) {
+      const detail = buildError?.message || "";
+      if (detail.includes("BUILD_DAILY_QUOTA_EXCEEDED")) return json({ error: "build_daily_quota_exceeded" }, 429);
+      if (detail.includes("PROFILE_REQUIRED")) return json({ error: "profile_required" }, 409);
+      return json({ error: "build_create_failed" }, 500);
+    }
+
     const identity = await fetch("https://api.github.com/user", { headers: ghHeaders });
-    if (!identity.ok) return json({ error: "github_identity_failed" }, 403);
+    if (!identity.ok) {
+      await supabaseAdmin.from("builds").update({
+        status: "failed", conclusion: "github_identity_failed", finished_at: new Date().toISOString(),
+      }).eq("id", build.id);
+      return json({ error: "github_identity_failed" }, 403);
+    }
     const githubUser = await identity.json();
     if (!githubUser.login || typeof githubUser.login !== "string") return json({ error: "github_identity_failed" }, 403);
     const slug = project.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 45) || "project";
@@ -88,7 +116,14 @@ Deno.serve(async (req) => {
       method: "POST", headers: ghHeaders,
       body: JSON.stringify({ name: repoName, description: "Web2APK Android app: " + project.name, private: true, has_issues: false, has_projects: false, has_wiki: false, auto_init: false }),
     });
-    if (!createRepo.ok) return json({ error: createRepo.status === 422 ? "github_repo_create_failed_name_conflict" : "github_repo_create_failed" }, createRepo.status === 422 ? 409 : createRepo.status);
+    if (!createRepo.ok) {
+      await supabaseAdmin.from("builds").update({
+        status: "failed",
+        conclusion: createRepo.status === 422 ? "repo_name_conflict" : "repo_create_failed",
+        finished_at: new Date().toISOString(),
+      }).eq("id", build.id);
+      return json({ error: createRepo.status === 422 ? "github_repo_create_failed_name_conflict" : "github_repo_create_failed" }, createRepo.status === 422 ? 409 : createRepo.status);
+    }
     const repoData = await createRepo.json();
     const fullName = repoData.full_name;
     if (!validRepo(fullName)) return json({ error: "github_repo_create_failed" }, 502);
@@ -102,23 +137,16 @@ Deno.serve(async (req) => {
         body: JSON.stringify({ message: "Web2APK: add " + path, content, branch: "main" }),
       });
       if (!response.ok) {
-        await supabase.from("projects").update({ status: "failed" }).eq("id", project.id);
+        await supabaseAdmin.from("builds").update({
+          status: "failed", conclusion: "github_file_push_failed", finished_at: new Date().toISOString(),
+        }).eq("id", build.id);
+        await supabaseAdmin.from("projects").update({ status: "failed" }).eq("id", project.id);
         return json({ error: "github_file_push_failed", path }, response.status);
       }
     }
     const projectUpdate = await supabase.from("projects").update({ repo: fullName, repo_full_name: fullName, status: "building" }).eq("id", project.id);
     if (projectUpdate.error) return json({ error: "project_update_failed" }, 500);
-    const { data: build, error: buildError } = await supabaseAdmin.from("builds").insert({ project_id: project.id, status: "queued", version: project.version_name + " (" + project.version_code + ")" }).select("id").single();
-    if (buildError || !build) {
-      const detail = buildError?.message || "";
-      if (detail.includes("PROJECT_QUOTA_EXCEEDED")) return json({ error: "project_quota_exceeded" }, 429);
-      if (detail.includes("BUILD_DAILY_QUOTA_EXCEEDED")) return json({ error: "build_daily_quota_exceeded" }, 429);
-      if (detail.includes("PROFILE_REQUIRED")) return json({ error: "profile_required" }, 409);
-      return json({ error: "build_create_failed" }, 500);
-    }
-    const buildType = body.buildType || "both";
-    const versionName = body.versionName || project.version_name;
-    const versionCode = Number(body.versionCode || project.version_code);
+
     const dispatchResponse = await fetch("https://api.github.com/repos/" + owner + "/" + repo + "/actions/workflows/android-build.yml/dispatches?return_run_details=true", {
       method: "POST", headers: ghHeaders,
       body: JSON.stringify({ ref: "main", inputs: { build_type: buildType, version_name: versionName, version_code: String(versionCode) } }),
@@ -163,7 +191,12 @@ Deno.serve(async (req) => {
       status: "queued",
       version: versionName + " (" + versionCode + ")",
     }).select("id").single();
-    if (buildError || !build) return json({ error: "build_create_failed" }, 500);
+    if (buildError || !build) {
+      const detail = buildError?.message || "";
+      if (detail.includes("BUILD_DAILY_QUOTA_EXCEEDED")) return json({ error: "build_daily_quota_exceeded" }, 429);
+      if (detail.includes("PROFILE_REQUIRED")) return json({ error: "profile_required" }, 409);
+      return json({ error: "build_create_failed" }, 500);
+    }
     const dispatchResponse = await fetch(
       "https://api.github.com/repos/" + owner + "/" + repo + "/actions/workflows/android-build.yml/dispatches?return_run_details=true",
       {
