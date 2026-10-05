@@ -39,7 +39,7 @@ function packageHash(value) {
     hash ^= char.codePointAt(0);
     hash = Math.imul(hash, 16777619);
   }
-  return (hash >>> 0).toString(36).padStart(7, "0").slice(0, 7);
+  return "h" + (hash >>> 0).toString(36).padStart(6, "0").slice(0, 6);
 }
 
 function registrableDomainParts(hostname) {
