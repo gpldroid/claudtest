@@ -1,4 +1,4 @@
-import { client, SUPABASE_URL, SUPABASE_KEY } from "./config.js";
+import { client, SUPABASE_URL, SUPABASE_KEY, getGitHubProviderToken } from "./config.js";
 
 const params = new URLSearchParams(location.search);
 const buildId = params.get("build") || "";
@@ -18,10 +18,7 @@ const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (c) => ({
   "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
 }[c]));
 
-const githubToken = async () => {
-  const { data: { session } } = await client.auth.getSession();
-  return session?.provider_token || "";
-};
+const githubToken = () => getGitHubProviderToken();
 
 function setProgress(value) {
   if (progressEl) progressEl.style.width = Math.max(0, Math.min(100, value)) + "%";
