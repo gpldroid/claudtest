@@ -1,1 +1,77 @@
-<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>مولّد التطبيقات — Web2APK</title><link rel="stylesheet" href="assets/css/style.css"><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script></head><body><header><a class="brand" href="index.html">◈ Web2APK</a><nav><a href="index.html">الرئيسية</a><a href="dashboard/">لوحة التحكم</a><a href="login.html">الحساب</a></nav></header><main class="wrap"><h1>إنشاء تطبيق أندرويد</h1><form id="generatorForm" class="panel grid"><label>رابط الموقع<input id="siteUrl" type="url" placeholder="https://example.com" required></label><label>اسم التطبيق<input id="appName" value="My Website" required></label><label>معرّف الحزمة<div class="package-row"><input id="packageId" value="com.example.myapp" required dir="ltr" autocomplete="off"><button class="btn" id="generatePackageId" type="button">توليد تلقائياً</button></div><small id="packageIdHint">سيتم اقتراح معرّف آمن تلقائياً من رابط الموقع واسم التطبيق.</small></label><label>الأيقونة<input id="appIcon" value="🌐"></label><label>اللون الأساسي<input id="primaryColor" type="color" value="#536dfe"></label><label>نص شاشة البداية<input id="splashText" value="Welcome"></label><label>رقم الإصدار<input id="versionName" type="text" value="1.0.0" required dir="ltr" inputmode="decimal" autocomplete="off" placeholder="1.0.0"></label><label>رقم النسخة<input id="versionCode" type="number" min="1" max="2100000000" value="1" required dir="ltr" inputmode="numeric" autocomplete="off"></label><fieldset><legend>الصلاحيات الاختيارية</legend><label><input type="checkbox" value="CAMERA"> الكاميرا</label><label><input type="checkbox" value="ACCESS_FINE_LOCATION"> الموقع</label><label><input type="checkbox" value="RECORD_AUDIO"> الميكروفون</label></fieldset><button class="btn primary" type="submit">إنشاء مشروع Android وتنزيل ZIP</button><p id="generatorMessage"></p></form></main><script type="module" src="assets/js/generator.js"></script></body></html>
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>مولّد التطبيقات — Web2APK</title>
+<link rel="stylesheet" href="assets/css/style.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+</head>
+<body>
+<header>
+  <a class="brand" href="index.html">◈ Web2APK</a>
+  <nav><a href="index.html">الرئيسية</a><a href="dashboard/">لوحة التحكم</a><a href="login.html">الحساب</a></nav>
+</header>
+<main class="wrap">
+  <h1>إنشاء تطبيق أندرويد</h1>
+  <form id="generatorForm" class="panel grid">
+    <label>رابط الموقع
+      <input id="siteUrl" type="url" placeholder="https://example.com" required dir="ltr" autocomplete="url">
+    </label>
+    <label>اسم التطبيق
+      <input id="appName" value="My Website" required maxlength="50">
+    </label>
+    <label>معرّف الحزمة
+      <div class="package-row">
+        <input id="packageId" value="com.example.myapp" required dir="ltr" autocomplete="off">
+        <button class="btn" id="generatePackageId" type="button">توليد تلقائياً</button>
+      </div>
+      <small id="packageIdHint">سيتم اقتراح معرّف آمن تلقائياً من رابط الموقع واسم التطبيق.</small>
+    </label>
+    <label>الأيقونة
+      <input id="appIcon" value="🌐">
+    </label>
+    <label>اللون الأساسي
+      <input id="primaryColor" type="color" value="#536dfe">
+    </label>
+    <label>نص شاشة البداية
+      <input id="splashText" value="Welcome">
+    </label>
+    <label>رقم الإصدار
+      <input id="versionName" type="text" value="1.0.0" required dir="ltr" inputmode="decimal" autocomplete="off" placeholder="1.0.0">
+    </label>
+    <label>رقم النسخة
+      <input id="versionCode" type="number" min="1" max="2100000000" value="1" required dir="ltr" inputmode="numeric" autocomplete="off">
+    </label>
+    <fieldset>
+      <legend>الصلاحيات الاختيارية</legend>
+      <label><input type="checkbox" value="CAMERA"> الكاميرا</label>
+      <label><input type="checkbox" value="ACCESS_FINE_LOCATION"> الموقع</label>
+      <label><input type="checkbox" value="RECORD_AUDIO"> الميكروفون</label>
+    </fieldset>
+    <fieldset>
+      <legend>أدوات التطوير</legend>
+      <label><input id="devTools" type="checkbox" checked> تفعيل أدوات WebView في Debug (Chrome DevTools / Console)</label>
+    </fieldset>
+    <button class="btn primary" type="submit">إنشاء مشروع Android وبدء البناء</button>
+    <p id="generatorMessage" role="status"></p>
+  </form>
+
+  <section class="panel web-preview" aria-labelledby="previewTitle">
+    <div class="preview-head">
+      <div>
+        <h2 id="previewTitle">Web App Viewer</h2>
+        <p class="muted">معاينة آمنة للموقع قبل إنشاء التطبيق. المعاينة تعمل فقط مع HTTPS.</p>
+      </div>
+      <a id="previewOpen" class="btn" href="#" target="_blank" rel="noopener noreferrer">فتح الموقع</a>
+    </div>
+    <div class="preview-frame-wrap">
+      <iframe id="webAppViewer" title="معاينة تطبيق الويب" sandbox="allow-forms allow-modals allow-popups allow-presentation allow-scripts allow-same-origin" referrerpolicy="strict-origin-when-cross-origin"></iframe>
+      <div id="previewEmpty" class="preview-empty">أدخل رابط HTTPS صالحاً لعرض المعاينة.</div>
+    </div>
+  </section>
+</main>
+<script type="module" src="assets/js/generator.js"></script>
+</body>
+</html>
