@@ -751,7 +751,7 @@ permissions:
   actions: read
 
 concurrency:
-  group: android-build-${{ github.ref }}
+  group: android-build-\${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -759,9 +759,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 25
     env:
-      BUILD_TYPE: ${{ inputs.build_type }}
-      VERSION_NAME: ${{ inputs.version_name }}
-      VERSION_CODE: ${{ inputs.version_code }}
+      BUILD_TYPE: \${{ inputs.build_type }}
+      VERSION_NAME: \${{ inputs.version_name }}
+      VERSION_CODE: \${{ inputs.version_code }}
     steps:
       - uses: actions/checkout@v4
       - name: Set up JDK 17
@@ -778,23 +778,23 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if [[ -z "${BUILD_TYPE:-}" ]]; then echo "BUILD_TYPE=both" >> "$GITHUB_ENV"; fi
-          if [[ -n "${VERSION_NAME:-}" && ! "$VERSION_NAME" =~ ^[0-9]+\.[0-9]+\.[0-9]+([+-][0-9A-Za-z.-]+)?$ ]]; then echo "Invalid version name" >&2; exit 1; fi
-          if [[ -n "${VERSION_CODE:-}" && ! "$VERSION_CODE" =~ ^[1-9][0-9]{0,9}$ ]]; then echo "Invalid version code" >&2; exit 1; fi
+          if [[ -z "\${BUILD_TYPE:-}" ]]; then echo "BUILD_TYPE=both" >> "$GITHUB_ENV"; fi
+          if [[ -n "\${VERSION_NAME:-}" && ! "$VERSION_NAME" =~ ^[0-9]+\.[0-9]+\.[0-9]+([+-][0-9A-Za-z.-]+)?$ ]]; then echo "Invalid version name" >&2; exit 1; fi
+          if [[ -n "\${VERSION_CODE:-}" && ! "$VERSION_CODE" =~ ^[1-9][0-9]{0,9}$ ]]; then echo "Invalid version code" >&2; exit 1; fi
       - name: Prepare release signing
         if: env.BUILD_TYPE != "debug"
         env:
-          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
-          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          KEYSTORE_B64: \${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: \${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: \${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: \${{ secrets.ANDROID_KEY_PASSWORD }}
         shell: bash
         run: |
           set -euo pipefail
           if [[ -z "$KEYSTORE_B64" || -z "$KEYSTORE_PASSWORD" || -z "$KEY_ALIAS" || -z "$KEY_PASSWORD" ]]; then echo "Release signing secrets are required for release builds." >&2; exit 1; fi
-          printf "%s" "$KEYSTORE_B64" | base64 --decode > "${{ runner.temp }}/web2apk-release.jks"
-          chmod 600 "${{ runner.temp }}/web2apk-release.jks"
-          echo "ANDROID_KEYSTORE_PATH=${{ runner.temp }}/web2apk-release.jks" >> "$GITHUB_ENV"
+          printf "%s" "$KEYSTORE_B64" | base64 --decode > "\${{ runner.temp }}/web2apk-release.jks"
+          chmod 600 "\${{ runner.temp }}/web2apk-release.jks"
+          echo "ANDROID_KEYSTORE_PATH=\${{ runner.temp }}/web2apk-release.jks" >> "$GITHUB_ENV"
           echo "ANDROID_KEYSTORE_PASSWORD=$KEYSTORE_PASSWORD" >> "$GITHUB_ENV"
           echo "ANDROID_KEY_ALIAS=$KEY_ALIAS" >> "$GITHUB_ENV"
           echo "ANDROID_KEY_PASSWORD=$KEY_PASSWORD" >> "$GITHUB_ENV"
@@ -803,12 +803,12 @@ jobs:
         run: |
           set -euo pipefail
           args=()
-          [[ -n "${VERSION_NAME:-}" ]] && args+=("-Pweb2apkVersionName=$VERSION_NAME")
-          [[ -n "${VERSION_CODE:-}" ]] && args+=("-Pweb2apkVersionCode=$VERSION_CODE")
-          case "${BUILD_TYPE:-both}" in
-            debug) gradle assembleDebug "${args[@]}" ;;
-            release) gradle assembleRelease bundleRelease "${args[@]}" ;;
-            both) gradle assembleDebug assembleRelease bundleRelease "${args[@]}" ;;
+          [[ -n "\${VERSION_NAME:-}" ]] && args+=("-Pweb2apkVersionName=$VERSION_NAME")
+          [[ -n "\${VERSION_CODE:-}" ]] && args+=("-Pweb2apkVersionCode=$VERSION_CODE")
+          case "\${BUILD_TYPE:-both}" in
+            debug) gradle assembleDebug "\${args[@]}" ;;
+            release) gradle assembleRelease bundleRelease "\${args[@]}" ;;
+            both) gradle assembleDebug assembleRelease bundleRelease "\${args[@]}" ;;
             *) echo "Unsupported build type" >&2; exit 1 ;;
           esac
       - name: Collect artifacts
@@ -816,12 +816,12 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p dist
-          if [[ "${BUILD_TYPE:-both}" == "debug" || "${BUILD_TYPE:-both}" == "both" ]]; then
+          if [[ "\${BUILD_TYPE:-both}" == "debug" || "\${BUILD_TYPE:-both}" == "both" ]]; then
             debug_apk=$(find app/build/outputs/apk/debug -type f -name "*.apk" -print -quit)
             test -n "$debug_apk"
             cp "$debug_apk" dist/web2apk-debug.apk
           fi
-          if [[ "${BUILD_TYPE:-both}" == "release" || "${BUILD_TYPE:-both}" == "both" ]]; then
+          if [[ "\${BUILD_TYPE:-both}" == "release" || "\${BUILD_TYPE:-both}" == "both" ]]; then
             release_apk=$(find app/build/outputs/apk/release -type f -name "*.apk" -print -quit)
             release_aab=$(find app/build/outputs/bundle/release -type f -name "*.aab" -print -quit)
             test -n "$release_apk"
@@ -963,23 +963,7 @@ form?.addEventListener("submit", async (event) => {
   }
 
   const files = buildFiles(config, iconPngs);
-  const zip = new JSZip();
-
-  for (const [path, body] of Object.entries(files)) {
-    if (typeof body === "object" && body.base64) {
-      zip.file(path, body.base64, { base64: true });
-    } else {
-      zip.file(path, body);
-    }
-  }
-
-  const blob = await zip.generateAsync({ type: "blob", compression: "DEFLATE" });
-  const href = URL.createObjectURL(blob);
-  const anchor = document.createElement("a");
-  anchor.href = href;
-  anchor.download = `${config.package.replace(/\./g, "-")}-android.zip`;
-  anchor.click();
-  setTimeout(() => URL.revokeObjectURL(href), 1000);
+  message.textContent = "تم تجهيز ملفات المشروع. جارٍ إنشاء مستودع GitHub وبدء البناء…";
 
   const { data: project, error: projectError } = await client.from("projects").insert({
     user_id: user.id,

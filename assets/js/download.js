@@ -175,6 +175,7 @@ function renderDownloads(artifacts, context) {
 let context;
 let countdown = 8;
 let timer = null;
+let startedAt = Date.now();
 let polling = null;
 
 async function poll() {
@@ -202,8 +203,8 @@ async function poll() {
     }
     setProgress(status === "building" ? 55 : 20);
     if (statusEl) statusEl.textContent = status === "building"
-      ? "جاري بناء APK/AAB على GitHub Actions…"
-      : "البناء في قائمة الانتظار…";
+      ? "جاري بناء APK/AAB على GitHub Actions… عادةً يستغرق ذلك بضع دقائق."
+      : "البناء في قائمة الانتظار؛ سيتم التحقق تلقائياً كل 8 ثوانٍ…";
   } catch (error) {
     if (error?.message === "github_session_required") {
       clearInterval(polling);
@@ -223,10 +224,18 @@ async function init() {
     await poll();
     if (!resultsEl?.classList.contains("hidden") || !errorEl?.classList.contains("hidden")) return;
 
+    startedAt = Date.now();
+    const renderTimer = () => {
+      const elapsed = Math.max(0, Math.floor((Date.now() - startedAt) / 1000));
+      const minutes = String(Math.floor(elapsed / 60)).padStart(2, "0");
+      const seconds = String(elapsed % 60).padStart(2, "0");
+      if (timerEl) timerEl.textContent = "الوقت المنقضي: " + minutes + ":" + seconds + " · التحقق التالي خلال " + countdown + " ثوانٍ";
+    };
+    renderTimer();
     timer = setInterval(() => {
       countdown -= 1;
       if (countdown <= 0) countdown = 8;
-      if (timerEl) timerEl.textContent = "سيتم التحقق خلال " + countdown + " ثوانٍ";
+      renderTimer();
     }, 1000);
     polling = setInterval(poll, 8000);
   } catch (error) {
