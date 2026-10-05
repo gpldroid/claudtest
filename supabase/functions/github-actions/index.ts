@@ -18,7 +18,7 @@ const json = (body: unknown, status = 200) => new Response(JSON.stringify(body),
 });
 const validRepo = (value: string) => /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(value);
 const validUuid = (value: unknown) => typeof value === "string" && /^[0-9a-fA-F-]{36}$/.test(value);
-const validPath = (value: string) => value.length > 0 && value.length <= 240 && !value.startsWith("/") && !value.includes("\\") && !/[\x00-\x1f]/.test(value);
+const validPath = (value: string) => {\n  if (value.length === 0 || value.length > 240 || value.startsWith("/") || value.includes("\\\\") || /[\\x00-\\x1f]/.test(value)) return false;\n  const segments = value.split("/");\n  return segments.every((segment) => segment.length > 0 && segment !== "." && segment !== "..");\n};
 const base64Utf8 = (value: string) => {
   const bytes = new TextEncoder().encode(value);
   let binary = "";
@@ -144,8 +144,8 @@ Deno.serve(async (req) => {
         return json({ error: "github_file_push_failed", path }, response.status);
       }
     }
-    const projectUpdate = await supabase.from("projects").update({ repo: fullName, repo_full_name: fullName, status: "building" }).eq("id", project.id);
-    if (projectUpdate.error) return json({ error: "project_update_failed" }, 500);
+    const projectUpdate = await supabaseAdmin.from("projects").update({ repo: fullName, repo_full_name: fullName, status: "building" }).eq("id", project.id);
+    if (projectUpdate.error) {\n      await supabaseAdmin.from("builds").update({ status: "failed", conclusion: "project_update_failed", finished_at: new Date().toISOString() }).eq("id", build.id);\n      return json({ error: "project_update_failed" }, 500);\n    }
 
     const dispatchResponse = await fetch("https://api.github.com/repos/" + owner + "/" + repo + "/actions/workflows/android-build.yml/dispatches?return_run_details=true", {
       method: "POST", headers: ghHeaders,
@@ -158,7 +158,7 @@ Deno.serve(async (req) => {
     }
     const dispatch = await dispatchResponse.json();
     const buildUpdate = await supabaseAdmin.from("builds").update({ run_id: dispatch.workflow_run_id, run_url: dispatch.html_url || dispatch.run_url || null }).eq("id", build.id);
-    if (buildUpdate.error) return json({ error: "build_update_failed" }, 500);
+    if (buildUpdate.error) {\n      await supabaseAdmin.from("builds").update({ status: "failed", conclusion: "build_link_failed", finished_at: new Date().toISOString() }).eq("id", build.id);\n      await supabaseAdmin.from("projects").update({ status: "failed" }).eq("id", project.id);\n      return json({ error: "build_update_failed" }, 500);\n    }
     return json({ ok: true, action: "provision_project", projectId: project.id, repo: fullName, buildId: build.id, runId: dispatch.workflow_run_id, runUrl: dispatch.html_url || dispatch.run_url || null });
   }
 
