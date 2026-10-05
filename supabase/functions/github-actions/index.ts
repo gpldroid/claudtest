@@ -109,7 +109,13 @@ Deno.serve(async (req) => {
     const projectUpdate = await supabase.from("projects").update({ repo: fullName, repo_full_name: fullName, status: "building" }).eq("id", project.id);
     if (projectUpdate.error) return json({ error: "project_update_failed" }, 500);
     const { data: build, error: buildError } = await supabaseAdmin.from("builds").insert({ project_id: project.id, status: "queued", version: project.version_name + " (" + project.version_code + ")" }).select("id").single();
-    if (buildError || !build) return json({ error: "build_create_failed" }, 500);
+    if (buildError || !build) {
+      const detail = buildError?.message || "";
+      if (detail.includes("PROJECT_QUOTA_EXCEEDED")) return json({ error: "project_quota_exceeded" }, 429);
+      if (detail.includes("BUILD_DAILY_QUOTA_EXCEEDED")) return json({ error: "build_daily_quota_exceeded" }, 429);
+      if (detail.includes("PROFILE_REQUIRED")) return json({ error: "profile_required" }, 409);
+      return json({ error: "build_create_failed" }, 500);
+    }
     const buildType = body.buildType || "both";
     const versionName = body.versionName || project.version_name;
     const versionCode = Number(body.versionCode || project.version_code);
@@ -141,7 +147,7 @@ Deno.serve(async (req) => {
     if (!["debug", "release", "both"].includes(buildType)) return json({ error: "invalid_build_type" }, 400);
     const versionName = body.versionName || "1.0.0";
     const versionCode = Number(body.versionCode || 1);
-    if (!/^\\d+\\.\\d+\\.\\d+(?:[-+][0-9A-Za-z.-]+)?$/.test(versionName) || versionName.length > 30) {
+    if (!/^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$/.test(versionName) || versionName.length > 30) {
       return json({ error: "invalid_version_name" }, 400);
     }
     if (!Number.isInteger(versionCode) || versionCode < 1 || versionCode > 2100000000) {
