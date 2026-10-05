@@ -668,6 +668,19 @@ form?.addEventListener("submit", async (event) => {
   }
 
   config.permissions = config.permissions.filter((p) => safePermissionNames.has(p));
+
+  const { data: { user } } = await client.auth.getUser();
+  if (!user) {
+    message.textContent = "سجّل الدخول عبر GitHub أولاً حتى نتمكن من إنشاء المستودع وبدء البناء.";
+    return;
+  }
+  const { data: { session } } = await client.auth.getSession();
+  const githubToken = session?.provider_token || "";
+  if (!githubToken) {
+    message.textContent = "انتهت صلاحية اتصال GitHub. أعد تسجيل الدخول باستخدام GitHub ثم حاول مرة أخرى.";
+    return;
+  }
+
   message.textContent = "جارٍ إنشاء مشروع Android كامل…";
 
   const rgb = hexToRgb(config.primary);
@@ -699,19 +712,6 @@ form?.addEventListener("submit", async (event) => {
   anchor.download = `${config.package.replace(/\./g, "-")}-android.zip`;
   anchor.click();
   setTimeout(() => URL.revokeObjectURL(href), 1000);
-
-  const { data: { user } } = await client.auth.getUser();
-  if (!user) {
-    message.textContent = "سجّل الدخول عبر GitHub أولاً حتى نتمكن من إنشاء المستودع وبدء البناء.";
-    return;
-  }
-
-  const { data: { session } } = await client.auth.getSession();
-  const githubToken = session?.provider_token || "";
-  if (!githubToken) {
-    message.textContent = "انتهت صلاحية اتصال GitHub. أعد تسجيل الدخول باستخدام GitHub ثم حاول مرة أخرى.";
-    return;
-  }
 
   const { data: project, error: projectError } = await client.from("projects").insert({
     user_id: user.id,
