@@ -3,15 +3,14 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import sodium from "npm:libsodium-wrappers@0.7.15";
 
 const ALLOWED_ORIGIN = "https://gpldroid.github.io";
-const corsFor = (req: Request) => ({
-  ...cors,
-  "Access-Control-Allow-Origin": ALLOWED_ORIGIN,
-  ...(req.headers.get("Origin") === ALLOWED_ORIGIN ? { Vary: "Origin" } : {}),
-});
 const cors = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
+const corsFor = (_req: Request) => ({
+  ...cors,
+  "Access-Control-Allow-Origin": ALLOWED_ORIGIN,
+});
 const allowedSecrets = new Set([
   "ANDROID_KEYSTORE_BASE64",
   "ANDROID_KEYSTORE_PASSWORD",
@@ -381,7 +380,7 @@ Deno.serve(async (req) => {
     return new Response(downloadResponse.body, {
       status: 200,
       headers: {
-        ...cors,
+        ...corsFor(req),
         "Content-Type": "application/zip",
         "Content-Disposition": `attachment; filename="web2apk-${artifactId}.zip"`,
         "Cache-Control": "private, no-store",
