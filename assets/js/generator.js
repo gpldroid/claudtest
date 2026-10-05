@@ -35,9 +35,9 @@ function packageSegment(value) {
 
 function generatePackageId(urlValue, appName) {
   try {
-    const hostname = new URL(urlValue).hostname.toLowerCase().replace(/^www\\./, "");
+    const hostname = new URL(urlValue).hostname.toLowerCase().replace(/^www\./, "");
     const domainParts = hostname.split(".").filter(Boolean).map(packageSegment).filter(Boolean);
-    const appParts = appName.normalize("NFKD").replace(/[\\u0300-\\u036f]/g, "")
+    const appParts = appName.normalize("NFKD").replace(/[\u0300-\u036f]/g, "")
       .split(/[^A-Za-z0-9_]+/).map(packageSegment).filter(Boolean);
     if (domainParts.length < 2) return "";
     const domain = domainParts.slice(-3);
