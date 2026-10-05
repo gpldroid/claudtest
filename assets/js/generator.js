@@ -778,9 +778,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if [[ -z "${BUILD_TYPE:-}" ]]; then echo "BUILD_TYPE=both" >> "$GITHUB_ENV"; fi
-          if [[ -n "${VERSION_NAME:-}" && ! "$VERSION_NAME" =~ ^[0-9]+\.[0-9]+\.[0-9]+([+-][0-9A-Za-z.-]+)?$ ]]; then echo "Invalid version name" >&2; exit 1; fi
-          if [[ -n "${VERSION_CODE:-}" && ! "$VERSION_CODE" =~ ^[1-9][0-9]{0,9}$ ]]; then echo "Invalid version code" >&2; exit 1; fi
+          if [[ -z "\${BUILD_TYPE:-}" ]]; then echo "BUILD_TYPE=both" >> "$GITHUB_ENV"; fi
+          if [[ -n "\${VERSION_NAME:-}" && ! "$VERSION_NAME" =~ ^[0-9]+\.[0-9]+\.[0-9]+([+-][0-9A-Za-z.-]+)?$ ]]; then echo "Invalid version name" >&2; exit 1; fi
+          if [[ -n "\${VERSION_CODE:-}" && ! "$VERSION_CODE" =~ ^[1-9][0-9]{0,9}$ ]]; then echo "Invalid version code" >&2; exit 1; fi
       - name: Prepare release signing
         if: env.BUILD_TYPE != "debug"
         env:
@@ -803,12 +803,12 @@ jobs:
         run: |
           set -euo pipefail
           args=()
-          [[ -n "${VERSION_NAME:-}" ]] && args+=("-Pweb2apkVersionName=$VERSION_NAME")
-          [[ -n "${VERSION_CODE:-}" ]] && args+=("-Pweb2apkVersionCode=$VERSION_CODE")
-          case "${BUILD_TYPE:-both}" in
-            debug) gradle assembleDebug "${args[@]}" ;;
-            release) gradle assembleRelease bundleRelease "${args[@]}" ;;
-            both) gradle assembleDebug assembleRelease bundleRelease "${args[@]}" ;;
+          [[ -n "\${VERSION_NAME:-}" ]] && args+=("-Pweb2apkVersionName=$VERSION_NAME")
+          [[ -n "\${VERSION_CODE:-}" ]] && args+=("-Pweb2apkVersionCode=$VERSION_CODE")
+          case "\${BUILD_TYPE:-both}" in
+            debug) gradle assembleDebug "\${args[@]}" ;;
+            release) gradle assembleRelease bundleRelease "\${args[@]}" ;;
+            both) gradle assembleDebug assembleRelease bundleRelease "\${args[@]}" ;;
             *) echo "Unsupported build type" >&2; exit 1 ;;
           esac
       - name: Collect artifacts
@@ -816,12 +816,12 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p dist
-          if [[ "${BUILD_TYPE:-both}" == "debug" || "${BUILD_TYPE:-both}" == "both" ]]; then
+          if [[ "\${BUILD_TYPE:-both}" == "debug" || "\${BUILD_TYPE:-both}" == "both" ]]; then
             debug_apk=$(find app/build/outputs/apk/debug -type f -name "*.apk" -print -quit)
             test -n "$debug_apk"
             cp "$debug_apk" dist/web2apk-debug.apk
           fi
-          if [[ "${BUILD_TYPE:-both}" == "release" || "${BUILD_TYPE:-both}" == "both" ]]; then
+          if [[ "\${BUILD_TYPE:-both}" == "release" || "\${BUILD_TYPE:-both}" == "both" ]]; then
             release_apk=$(find app/build/outputs/apk/release -type f -name "*.apk" -print -quit)
             release_aab=$(find app/build/outputs/bundle/release -type f -name "*.aab" -print -quit)
             test -n "$release_apk"
