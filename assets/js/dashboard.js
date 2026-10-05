@@ -126,12 +126,21 @@ async function startBuild(projectId, repo, buildType, button) {
     const { data, error } = await client.functions.invoke("github-actions", {
       body: { action: "start_build", projectId, repo, githubToken: token, buildType }
     });
-    if (error || !data?.ok) throw new Error("build_failed");
+    if (error || !data?.ok) {
+      const code = data?.error || "";
+      if (code === "build_daily_quota_exceeded") throw new Error("build_daily_quota_exceeded");
+      if (code === "profile_required") throw new Error("profile_required");
+      throw new Error("build_failed");
+    }
     button.textContent = "بدأ البناء";
     setTimeout(() => { button.textContent = original; }, 2500);
     setTimeout(() => init(), 1200);
-  } catch {
-    button.textContent = "تعذر البدء";
+  } catch (error) {
+    button.textContent = error?.message === "build_daily_quota_exceeded"
+      ? "وصلت إلى حد البناء المجاني اليومي"
+      : error?.message === "profile_required"
+        ? "يجب إنشاء ملف الحساب أولاً"
+        : "تعذر البدء";
     setTimeout(() => { button.textContent = original; }, 2500);
   } finally {
     button.disabled = false;
