@@ -241,8 +241,15 @@ async function canvasPngFromDataUrl(size, dataUrl, background) {
   const image = new Image();
   image.decoding = "async";
   await new Promise((resolve, reject) => {
-    image.onload = resolve;
-    image.onerror = reject;
+    const timeout = window.setTimeout(() => reject(new Error("icon_decode_timeout")), 5000);
+    image.onload = () => {
+      window.clearTimeout(timeout);
+      resolve();
+    };
+    image.onerror = () => {
+      window.clearTimeout(timeout);
+      reject(new Error("icon_decode_failed"));
+    };
     image.src = dataUrl;
   });
   const canvas = document.createElement("canvas");
@@ -265,6 +272,39 @@ function iconLetter(iconValue, appName) {
   const trimmed = iconValue.trim();
   if (trimmed) return Array.from(trimmed)[0];
   return Array.from(appName.trim())[0] || "W";
+}
+
+function renderGeneratorProgress(label, seconds = null) {
+  if (!message) return { setLabel() {}, setSeconds() {} };
+  message.innerHTML = "";
+  const wrapper = document.createElement("div");
+  wrapper.className = "generator-progress";
+  wrapper.setAttribute("aria-live", "polite");
+  const labelNode = document.createElement("span");
+  labelNode.className = "generator-progress-label";
+  labelNode.textContent = label;
+  const timerNode = document.createElement("strong");
+  timerNode.className = "generator-progress-timer";
+  timerNode.hidden = seconds === null;
+  timerNode.textContent = seconds === null ? "" : String(seconds);
+  wrapper.append(labelNode, timerNode);
+  message.appendChild(wrapper);
+  return {
+    setLabel(value) { labelNode.textContent = value; },
+    setSeconds(value) {
+      timerNode.hidden = value === null;
+      if (value !== null) timerNode.textContent = String(value);
+    }
+  };
+}
+
+function showGeneratorError(text) {
+  if (!message) return;
+  message.textContent = text;
+}
+
+function wait(ms) {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
 }
 
 function buildFiles(config, iconPngs) {
@@ -883,8 +923,10 @@ zipStorePath=wrapper/dists
 
 form?.addEventListener("submit", async (event) => {
   event.preventDefault();
+  if (!message) return;
 
-  updateGeneratedPackageId();
+  try {
+    updateGeneratedPackageId();
   const config = {
     url: get("siteUrl"),
     name: get("appName"),
@@ -932,7 +974,12 @@ form?.addEventListener("submit", async (event) => {
     return;
   }
 
-  message.textContent = "جارٍ إنشاء مشروع Android كامل…";
+  const progress = renderGeneratorProgress("جارٍ بدء التحضير الآمن للمشروع…", 5);
+  for (let seconds = 5; seconds > 0; seconds -= 1) {
+    progress.setSeconds(seconds);
+    await wait(1000);
+  }
+  progress.setSeconds(null);
 
   const rgb = hexToRgb(config.primary);
   const letter = iconLetter(config.icon, config.name);
@@ -962,8 +1009,11 @@ form?.addEventListener("submit", async (event) => {
     };
   }
 
+  progress.setLabel("تم تجهيز الأيقونة. جارٍ إنشاء ملفات مشروع Android…");
   const files = buildFiles(config, iconPngs);
-  message.textContent = "تم تجهيز ملفات المشروع. جارٍ إنشاء مستودع GitHub وبدء البناء…";
+  progress.setLabel("تم تجهيز الملفات. جارٍ حفظ المشروع وبدء البناء…");
+
+  progress.setLabel("جارٍ حفظ المشروع في قاعدة البيانات…");
 
   const { data: project, error: projectError } = await client.from("projects").insert({
     user_id: user.id,
@@ -990,7 +1040,7 @@ form?.addEventListener("submit", async (event) => {
     return;
   }
 
-  message.textContent = "تم حفظ المشروع. جارٍ إنشاء مستودع GitHub وبدء البناء…";
+  progress.setLabel("تم حفظ المشروع. جارٍ إنشاء مستودع GitHub وبدء البناء…");
 
   const { data: provision, error: provisionError } = await client.functions.invoke("github-actions", {
     body: {
@@ -1014,5 +1064,12 @@ form?.addEventListener("submit", async (event) => {
     return;
   }
 
+  progress.setLabel("تم بدء البناء بنجاح. فتح صفحة التحميل…");
+  progress.setSeconds(1);
+  await wait(1000);
   window.location.href = "download.html?build=" + encodeURIComponent(provision.buildId) + "&project=" + encodeURIComponent(provision.projectId);
+  } catch (error) {
+    console.error("Web2APK generator error", error);
+    showGeneratorError("تعذر إكمال العملية. لم يتم إنشاء زر تحميل وهمي؛ تحقق من حالة المشروع في لوحة التحكم ثم حاول مرة أخرى.");
+  }
 });
