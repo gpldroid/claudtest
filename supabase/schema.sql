@@ -37,7 +37,7 @@ create table if not exists public.builds (
   id uuid primary key default gen_random_uuid(),
   project_id uuid not null references public.projects(id) on delete cascade,
   run_id bigint,
-  status text not null default 'queued' check (status in ('queued', 'in_progress', 'completed', 'failed', 'cancelled', 'expired')),
+  status text not null default 'queued' check (status in ('queued', 'building', 'success', 'failed', 'cancelled', 'expired')),
   conclusion text,
   run_url text,
   artifact_ids jsonb not null default '[]'::jsonb,
