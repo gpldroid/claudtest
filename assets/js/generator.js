@@ -99,6 +99,8 @@ let appNameManuallyEdited = false;
 let metadataTimer = null;
 let metadataRequestId = 0;
 let previewUrl = "";
+let generatorStage = "بدء العملية";
+let createdProjectId = "";
 
 const packageInput = document.querySelector("#packageId");
 const packageAutoButton = document.querySelector("#generatePackageId");
@@ -926,6 +928,7 @@ form?.addEventListener("submit", async (event) => {
   if (!message) return;
 
   try {
+    generatorStage = "التحقق من المدخلات";
     updateGeneratedPackageId();
   const config = {
     url: get("siteUrl"),
@@ -975,6 +978,7 @@ form?.addEventListener("submit", async (event) => {
   }
 
   const progress = renderGeneratorProgress("جارٍ تجهيز طلب الإنشاء…", 20);
+  generatorStage = "تجهيز الطلب";
   for (let seconds = 20; seconds > 0; seconds -= 1) {
     progress.setSeconds(seconds);
     if (seconds <= 15) progress.setLabel("جارٍ تجهيز ملفات التطبيق والتحقق من المدخلات…");
@@ -987,6 +991,7 @@ form?.addEventListener("submit", async (event) => {
   let iconPngs;
   if (detectedIconDataUrl) {
     try {
+      generatorStage = "معالجة الأيقونة";
       progress.setLabel("جارٍ معالجة أيقونة الموقع…");
       const image = new Image();
       image.decoding = "async";
@@ -1042,10 +1047,12 @@ form?.addEventListener("submit", async (event) => {
     };
   }
 
+  generatorStage = "إنشاء ملفات Android";
   progress.setLabel("تم تجهيز الأيقونة. جارٍ إنشاء ملفات مشروع Android…");
   const files = buildFiles(config, iconPngs);
   progress.setLabel("تم تجهيز الملفات. جارٍ حفظ المشروع وبدء البناء…");
 
+  generatorStage = "حفظ المشروع";
   progress.setLabel("جارٍ حفظ المشروع في قاعدة البيانات…");
 
   const { data: project, error: projectError } = await client.from("projects").insert({
@@ -1076,6 +1083,8 @@ form?.addEventListener("submit", async (event) => {
     return;
   }
 
+  createdProjectId = project.id;
+  generatorStage = "ربط GitHub وبدء البناء";
   progress.setLabel("تم حفظ المشروع. جارٍ إنشاء مستودع GitHub وبدء البناء…");
 
   const { data: provision, error: provisionError } = await client.functions.invoke("github-actions", {
@@ -1091,15 +1100,27 @@ form?.addEventListener("submit", async (event) => {
   });
 
   if (provisionError || !provision?.ok) {
-    const code = provision?.error || provisionError?.message || "";
-    console.error("Web2APK provisioning failed", provisionError || provision);
-    message.textContent = code === "build_daily_quota_exceeded"
+    const code = provision?.error || provisionError?.message || "provision_failed";
+    console.error("Web2APK provisioning failed", {
+      stage: generatorStage,
+      code,
+      message: provisionError?.message || "",
+      details: provisionError?.context || null
+    });
+    const friendly = code === "build_daily_quota_exceeded"
       ? "وصلت إلى حد البناء المجاني اليومي: 10 عمليات."
       : code === "project_quota_exceeded"
         ? "وصلت إلى الحد المجاني: 10 مشاريع."
         : code === "profile_required"
           ? "لم يتم تجهيز ملف حسابك بعد. افتح لوحة التحكم ثم حاول مرة أخرى."
-          : "تعذر إنشاء مستودع GitHub أو بدء عملية البناء. لم يتم إنشاء زر تحميل وهمي.";
+          : code === "invalid_github_token" || code === "github_identity_failed"
+            ? "جلسة GitHub غير صالحة أو انتهت. أعد ربط GitHub ثم حاول مرة أخرى."
+            : code === "project_too_large"
+              ? "ملفات المشروع أكبر من الحد المسموح. أعد المحاولة بدون أيقونة مخصصة كبيرة."
+              : code === "github_repo_create_failed_name_conflict"
+                ? "يوجد مستودع بنفس الاسم لهذه العملية. افتح لوحة التحكم للتحقق قبل إعادة المحاولة."
+                : "تعذر بدء البناء (" + code + "). لم يتم إنشاء زر تحميل وهمي. افتح لوحة التحكم للتحقق من المشروع.";
+    message.textContent = friendly;
     return;
   }
 
@@ -1108,7 +1129,16 @@ form?.addEventListener("submit", async (event) => {
   await wait(1000);
   window.location.href = "download.html?build=" + encodeURIComponent(provision.buildId) + "&project=" + encodeURIComponent(provision.projectId);
   } catch (error) {
-    console.error("Web2APK generator error", error);
-    showGeneratorError("تعذر إكمال العملية. لم يتم إنشاء زر تحميل وهمي؛ تحقق من حالة المشروع في لوحة التحكم ثم حاول مرة أخرى.");
+    console.error("Web2APK generator error", {
+      stage: generatorStage,
+      projectId: createdProjectId || null,
+      error
+    });
+    const detail = error instanceof Error ? error.message : String(error || "unknown_error");
+    showGeneratorError(
+      createdProjectId
+        ? "توقفت العملية أثناء " + generatorStage + ". تم حفظ المشروع برقم " + createdProjectId + ". لم يتم إنشاء زر تحميل وهمي. افتح لوحة التحكم للتحقق من حالته. (" + detail + ")"
+        : "توقفت العملية أثناء " + generatorStage + ". لم يتم إنشاء زر تحميل وهمي. (" + detail + ")"
+    );
   }
 });
