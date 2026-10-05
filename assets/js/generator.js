@@ -846,7 +846,7 @@ jobs:
         run: |
           set -euo pipefail
           rm -f dist/web2apk-source.zip
-          zip -qr dist/web2apk-source.zip . -x ".git/*" "app/build/*" "build/*" ".gradle/*"
+          zip -qr dist/web2apk-source.zip . -x ".git/*" "app/build/*" "build/*" ".gradle/*" "dist/*"
           test -s dist/web2apk-source.zip
 
       - name: Upload source code
