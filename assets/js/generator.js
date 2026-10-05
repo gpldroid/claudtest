@@ -974,27 +974,60 @@ form?.addEventListener("submit", async (event) => {
     return;
   }
 
-  const progress = renderGeneratorProgress("جارٍ بدء التحضير الآمن للمشروع…", 5);
-  for (let seconds = 5; seconds > 0; seconds -= 1) {
+  const progress = renderGeneratorProgress("جارٍ تجهيز طلب الإنشاء…", 20);
+  for (let seconds = 20; seconds > 0; seconds -= 1) {
     progress.setSeconds(seconds);
+    if (seconds <= 15) progress.setLabel("جارٍ تجهيز ملفات التطبيق والتحقق من المدخلات…");
+    if (seconds <= 8) progress.setLabel("جارٍ تجهيز الأيقونة وملفات Android بأمان…");
     await wait(1000);
   }
   progress.setSeconds(null);
 
-  const rgb = hexToRgb(config.primary);
   const letter = iconLetter(config.icon, config.name);
   let iconPngs;
   if (detectedIconDataUrl) {
     try {
-      iconPngs = {
-        foreground: await canvasPngFromDataUrl(432, detectedIconDataUrl, null),
-        mdpi: await canvasPngFromDataUrl(48, detectedIconDataUrl, config.primary),
-        hdpi: await canvasPngFromDataUrl(72, detectedIconDataUrl, config.primary),
-        xhdpi: await canvasPngFromDataUrl(96, detectedIconDataUrl, config.primary),
-        xxhdpi: await canvasPngFromDataUrl(144, detectedIconDataUrl, config.primary),
-        xxxhdpi: await canvasPngFromDataUrl(192, detectedIconDataUrl, config.primary)
+      progress.setLabel("جارٍ معالجة أيقونة الموقع…");
+      const image = new Image();
+      image.decoding = "async";
+      await new Promise((resolve, reject) => {
+        const timeout = window.setTimeout(() => reject(new Error("icon_decode_timeout")), 5000);
+        image.onload = () => {
+          window.clearTimeout(timeout);
+          resolve();
+        };
+        image.onerror = () => {
+          window.clearTimeout(timeout);
+          reject(new Error("icon_decode_failed"));
+        };
+        image.src = detectedIconDataUrl;
+      });
+      const renderIcon = async (size, background) => {
+        const canvas = document.createElement("canvas");
+        canvas.width = size;
+        canvas.height = size;
+        const ctx = canvas.getContext("2d");
+        if (background) {
+          ctx.fillStyle = background;
+          ctx.fillRect(0, 0, size, size);
+        }
+        const padding = Math.round(size * 0.08);
+        const scale = Math.min((size - padding * 2) / image.naturalWidth, (size - padding * 2) / image.naturalHeight);
+        const width = Math.max(1, Math.round(image.naturalWidth * scale));
+        const height = Math.max(1, Math.round(image.naturalHeight * scale));
+        ctx.drawImage(image, Math.round((size - width) / 2), Math.round((size - height) / 2), width, height);
+        return canvas.toDataURL("image/png").split(",")[1];
       };
-    } catch {
+      iconPngs = {
+        foreground: await renderIcon(432, null),
+        mdpi: await renderIcon(48, config.primary),
+        hdpi: await renderIcon(72, config.primary),
+        xhdpi: await renderIcon(96, config.primary),
+        xxhdpi: await renderIcon(144, config.primary),
+        xxxhdpi: await renderIcon(192, config.primary)
+      };
+    } catch (iconError) {
+      console.warn("Web2APK icon preparation failed; using fallback icon.", iconError);
       detectedIconDataUrl = "";
     }
   }
@@ -1034,9 +1067,12 @@ form?.addEventListener("submit", async (event) => {
 
   if (projectError || !project) {
     const detail = projectError?.message || "";
+    console.error("Web2APK project creation failed", projectError);
     message.textContent = detail.includes("PROJECT_QUOTA_EXCEEDED")
       ? "وصلت إلى الحد المجاني: 10 مشاريع."
-      : "تعذر حفظ المشروع في قاعدة البيانات.";
+      : detail.includes("PROFILE_REQUIRED")
+        ? "لم يتم تجهيز ملف حسابك بعد. افتح لوحة التحكم ثم حاول مرة أخرى."
+        : "تعذر حفظ المشروع. حاول مرة أخرى أو افتح لوحة التحكم للتحقق من الحالة.";
     return;
   }
 
@@ -1055,12 +1091,15 @@ form?.addEventListener("submit", async (event) => {
   });
 
   if (provisionError || !provision?.ok) {
-    const code = provision?.error || "";
+    const code = provision?.error || provisionError?.message || "";
+    console.error("Web2APK provisioning failed", provisionError || provision);
     message.textContent = code === "build_daily_quota_exceeded"
       ? "وصلت إلى حد البناء المجاني اليومي: 10 عمليات."
       : code === "project_quota_exceeded"
         ? "وصلت إلى الحد المجاني: 10 مشاريع."
-        : "تعذر إنشاء مستودع GitHub أو بدء عملية البناء.";
+        : code === "profile_required"
+          ? "لم يتم تجهيز ملف حسابك بعد. افتح لوحة التحكم ثم حاول مرة أخرى."
+          : "تعذر إنشاء مستودع GitHub أو بدء عملية البناء. لم يتم إنشاء زر تحميل وهمي.";
     return;
   }
 
