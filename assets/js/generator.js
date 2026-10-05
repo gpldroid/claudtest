@@ -125,6 +125,9 @@ kotlin.code.style=official
     id("org.jetbrains.kotlin.android")
 }
 
+val injectedVersionName = providers.gradleProperty("web2apkVersionName").orElse("${escapeKotlin(config.versionName)}")
+val injectedVersionCode = providers.gradleProperty("web2apkVersionCode").map(String::toInt).orElse(${config.versionCode})
+
 android {
     namespace = "${escapeKotlin(config.package)}"
     compileSdk = 36
@@ -133,11 +136,23 @@ android {
         applicationId = "${escapeKotlin(config.package)}"
         minSdk = 23
         targetSdk = 36
-        versionCode = ${config.versionCode}
-        versionName = "${escapeKotlin(config.versionName)}"
+        versionCode = injectedVersionCode.get()
+        versionName = injectedVersionName.get()
     }
 
-    signingConfigs {\n        create("release") {\n            val keystorePath = System.getenv("ANDROID_KEYSTORE_PATH")\n            if (!keystorePath.isNullOrBlank()) {\n                storeFile = file(keystorePath)\n                storePassword = System.getenv("ANDROID_KEYSTORE_PASSWORD")\n                keyAlias = System.getenv("ANDROID_KEY_ALIAS")\n                keyPassword = System.getenv("ANDROID_KEY_PASSWORD")\n            }\n        }\n    }\n\n    buildTypes {
+    signingConfigs {
+        create("release") {
+            val keystorePath = System.getenv("ANDROID_KEYSTORE_PATH")
+            if (!keystorePath.isNullOrBlank()) {
+                storeFile = file(keystorePath)
+                storePassword = System.getenv("ANDROID_KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("ANDROID_KEY_ALIAS")
+                keyPassword = System.getenv("ANDROID_KEY_PASSWORD")
+            }
+        }
+    }
+
+    buildTypes {
         debug {
             applicationIdSuffix = ".debug"
             versionNameSuffix = "-debug"
@@ -145,6 +160,9 @@ android {
         release {
             isMinifyEnabled = true
             isShrinkResources = true
+            if (!System.getenv("ANDROID_KEYSTORE_PATH").isNullOrBlank()) {
+                signingConfig = signingConfigs.getByName("release")
+            }
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -495,7 +513,111 @@ captures/
 *.apk
 *.aab
 `,
-    ".github/workflows/android-build.yml": `name: Build Android\n\non:\n  push:\n    branches: ["main"]\n  workflow_dispatch:\n    inputs:\n      build_type:\n        description: "Build type"\n        required: true\n        default: "both"\n        type: choice\n        options: ["debug", "release", "both"]\n      version_name:\n        description: "Optional version name override"\n        required: false\n        type: string\n      version_code:\n        description: "Optional version code override"\n        required: false\n        type: string\n\npermissions:\n  contents: read\n  actions: read\n\nconcurrency:\n  group: android-build-${{ github.ref }}\n  cancel-in-progress: true\n\njobs:\n  build:\n    runs-on: ubuntu-latest\n    timeout-minutes: 25\n    env:\n      BUILD_TYPE: ${{ inputs.build_type }}\n      VERSION_NAME: ${{ inputs.version_name }}\n      VERSION_CODE: ${{ inputs.version_code }}\n    steps:\n      - uses: actions/checkout@v4\n\n      - name: Set up JDK 17\n        uses: actions/setup-java@v4\n        with:\n          distribution: temurin\n          java-version: "17"\n          cache: gradle\n\n      - name: Set up Gradle 9.6\n        uses: gradle/actions/setup-gradle@v4\n        with:\n          gradle-version: "9.6"\n\n      - name: Normalize inputs\n        shell: bash\n        run: |\n          set -euo pipefail\n          [[ -n "${BUILD_TYPE:-}" ]] || echo "BUILD_TYPE=both" >> "$GITHUB_ENV"\n          if [[ -n "${VERSION_NAME:-}" && ! "$VERSION_NAME" =~ ^[0-9]+\.[0-9]+\.[0-9]+([+-][0-9A-Za-z.-]+)?$ ]]; then echo "Invalid version name" >&2; exit 1; fi\n          if [[ -n "${VERSION_CODE:-}" && ! "$VERSION_CODE" =~ ^[1-9][0-9]{0,9}$ ]]; then echo "Invalid version code" >&2; exit 1; fi\n\n      - name: Prepare release signing\n        if: env.BUILD_TYPE != "debug"\n        env:\n          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}\n          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}\n          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}\n          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}\n        shell: bash\n        run: |\n          set -euo pipefail\n          if [[ -z "$KEYSTORE_B64" || -z "$KEYSTORE_PASSWORD" || -z "$KEY_ALIAS" || -z "$KEY_PASSWORD" ]]; then echo "Release signing secrets are not configured; building unsigned release."; exit 0; fi\n          printf "%s" "$KEYSTORE_B64" | base64 --decode > "${{ runner.temp }}/web2apk-release.jks"\n          chmod 600 "${{ runner.temp }}/web2apk-release.jks"\n          echo "ANDROID_KEYSTORE_PATH=${{ runner.temp }}/web2apk-release.jks" >> "$GITHUB_ENV"\n          echo "ANDROID_KEYSTORE_PASSWORD=$KEYSTORE_PASSWORD" >> "$GITHUB_ENV"\n          echo "ANDROID_KEY_ALIAS=$KEY_ALIAS" >> "$GITHUB_ENV"\n          echo "ANDROID_KEY_PASSWORD=$KEY_PASSWORD" >> "$GITHUB_ENV"\n\n      - name: Build\n        shell: bash\n        run: |\n          set -euo pipefail\n          args=()\n          [[ -n "${VERSION_NAME:-}" ]] && args+=("-Pweb2apkVersionName=$VERSION_NAME")\n          [[ -n "${VERSION_CODE:-}" ]] && args+=("-Pweb2apkVersionCode=$VERSION_CODE")\n          case "${BUILD_TYPE:-both}" in\n            debug) gradle assembleDebug "${args[@]}" ;;\n            release) gradle assembleRelease bundleRelease "${args[@]}" ;;\n            both) gradle assembleDebug assembleRelease bundleRelease "${args[@]}" ;;\n            *) echo "Unsupported build type" >&2; exit 1 ;;\n          esac\n\n      - name: Collect artifacts\n        shell: bash\n        run: |\n          set -euo pipefail\n          mkdir -p dist\n          find app/build/outputs/apk -type f -name "*.apk" -exec cp {} dist/ \;\n          find app/build/outputs/bundle -type f -name "*.aab" -exec cp {} dist/ \;\n          test -n "$(find dist -type f -print -quit)"\n          for file in dist/*; do sha256sum "$file" | tee "$file.sha256"; done\n\n      - name: Upload artifacts\n        uses: actions/upload-artifact@v7\n        with:\n          name: web2apk-${{ github.run_number }}-${{ github.sha }}\n          path: dist/*\n          if-no-files-found: error\n          retention-days: 14\n`,    "gradle/wrapper/gradle-wrapper.properties": `distributionBase=GRADLE_USER_HOME
+    ".github/workflows/android-build.yml": `name: Build Android
+
+on:
+  push:
+    branches: ["main"]
+  workflow_dispatch:
+    inputs:
+      build_type:
+        description: "Build type"
+        required: true
+        default: "both"
+        type: choice
+        options: ["debug", "release", "both"]
+      version_name:
+        description: "Optional version name override"
+        required: false
+        type: string
+      version_code:
+        description: "Optional version code override"
+        required: false
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: android-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      BUILD_TYPE: ${{ inputs.build_type }}
+      VERSION_NAME: ${{ inputs.version_name }}
+      VERSION_CODE: ${{ inputs.version_code }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+      - name: Set up Gradle 9.6
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "9.6"
+      - name: Normalize inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${BUILD_TYPE:-}" ]]; then echo "BUILD_TYPE=both" >> "$GITHUB_ENV"; fi
+          if [[ -n "${VERSION_NAME:-}" && ! "$VERSION_NAME" =~ ^[0-9]+\.[0-9]+\.[0-9]+([+-][0-9A-Za-z.-]+)?$ ]]; then echo "Invalid version name" >&2; exit 1; fi
+          if [[ -n "${VERSION_CODE:-}" && ! "$VERSION_CODE" =~ ^[1-9][0-9]{0,9}$ ]]; then echo "Invalid version code" >&2; exit 1; fi
+      - name: Prepare release signing
+        if: env.BUILD_TYPE != "debug"
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "$KEYSTORE_B64" || -z "$KEYSTORE_PASSWORD" || -z "$KEY_ALIAS" || -z "$KEY_PASSWORD" ]]; then echo "Release signing secrets are required for release builds." >&2; exit 1; fi
+          printf "%s" "$KEYSTORE_B64" | base64 --decode > "${{ runner.temp }}/web2apk-release.jks"
+          chmod 600 "${{ runner.temp }}/web2apk-release.jks"
+          echo "ANDROID_KEYSTORE_PATH=${{ runner.temp }}/web2apk-release.jks" >> "$GITHUB_ENV"
+          echo "ANDROID_KEYSTORE_PASSWORD=$KEYSTORE_PASSWORD" >> "$GITHUB_ENV"
+          echo "ANDROID_KEY_ALIAS=$KEY_ALIAS" >> "$GITHUB_ENV"
+          echo "ANDROID_KEY_PASSWORD=$KEY_PASSWORD" >> "$GITHUB_ENV"
+      - name: Build
+        shell: bash
+        run: |
+          set -euo pipefail
+          args=()
+          [[ -n "${VERSION_NAME:-}" ]] && args+=("-Pweb2apkVersionName=$VERSION_NAME")
+          [[ -n "${VERSION_CODE:-}" ]] && args+=("-Pweb2apkVersionCode=$VERSION_CODE")
+          case "${BUILD_TYPE:-both}" in
+            debug) gradle assembleDebug "${args[@]}" ;;
+            release) gradle assembleRelease bundleRelease "${args[@]}" ;;
+            both) gradle assembleDebug assembleRelease bundleRelease "${args[@]}" ;;
+            *) echo "Unsupported build type" >&2; exit 1 ;;
+          esac
+      - name: Collect artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          find app/build/outputs/apk -type f -name "*.apk" -exec cp {} dist/ \;
+          find app/build/outputs/bundle -type f -name "*.aab" -exec cp {} dist/ \;
+          test -n "$(find dist -type f -print -quit)"
+          for file in dist/*; do sha256sum "$file" | tee "$file.sha256"; done
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: web2apk-${{ github.run_number }}-${{ github.sha }}
+          path: dist/*
+          if-no-files-found: error
+          retention-days: 14
+`,
+    "gradle/wrapper/gradle-wrapper.properties": `distributionBase=GRADLE_USER_HOME
 distributionPath=wrapper/dists
 distributionUrl=https\\://services.gradle.org/distributions/gradle-9.6.0-bin.zip
 networkTimeout=10000
