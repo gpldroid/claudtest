@@ -95,15 +95,24 @@ async function downloadArtifact(buildId, repo, artifactId, button) {
       throw new Error(body.error || "download_failed");
     }
 
-    const blob = await response.blob();
-    const disposition = response.headers.get("Content-Disposition") || "";
-    const match = disposition.match(/filename="([^"]+)"/);
-    const filename = match?.[1] || ("web2apk-" + artifactId + ".zip");
+    const archive = await response.blob();
+    if (!window.JSZip) throw new Error("zip_decoder_unavailable");
+
+    const zip = await window.JSZip.loadAsync(archive);
+    const candidates = Object.keys(zip.files).filter((name) => /\.(apk|aab)$/i.test(name) && !zip.files[name].dir);
+    if (!candidates.length) throw new Error("apk_aab_missing");
+
+    const preferred = candidates.find((name) => /web2apk-(debug|release)\.(apk|aab)$/i.test(name)) || candidates[0];
+    const file = zip.files[preferred];
+    const blob = await file.async("blob");
+    const filename = preferred.split("/").pop();
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
     anchor.href = url;
     anchor.download = filename;
+    document.body.appendChild(anchor);
     anchor.click();
+    anchor.remove();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   } catch {
     button.textContent = "تعذر التنزيل";

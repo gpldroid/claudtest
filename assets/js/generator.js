@@ -120,6 +120,31 @@ packageAutoButton?.addEventListener("click", (event) => {
 
 updateGeneratedPackageId();
 
+const previewFrame = document.querySelector("#webAppViewer");
+const previewEmpty = document.querySelector("#previewEmpty");
+const previewOpen = document.querySelector("#previewOpen");
+
+function updateWebAppViewer() {
+  const value = get("siteUrl");
+  if (!previewFrame || !previewEmpty || !previewOpen) return;
+  if (!validUrl(value)) {
+    previewFrame.removeAttribute("src");
+    previewEmpty.hidden = false;
+    previewOpen.href = "#";
+    previewOpen.setAttribute("aria-disabled", "true");
+    return;
+  }
+  previewFrame.src = value;
+  previewEmpty.hidden = true;
+  previewOpen.href = value;
+  previewOpen.removeAttribute("aria-disabled");
+}
+
+document.querySelector("#siteUrl")?.addEventListener("input", updateWebAppViewer);
+document.querySelector("#siteUrl")?.addEventListener("change", updateWebAppViewer);
+document.querySelector("#siteUrl")?.addEventListener("blur", updateWebAppViewer);
+updateWebAppViewer();
+
 const safePermissionNames = new Set([
   "CAMERA",
   "ACCESS_FINE_LOCATION",
@@ -220,12 +245,17 @@ android {
     namespace = "${escapeKotlin(config.package)}"
     compileSdk = 36
 
+    buildFeatures {
+        buildConfig = true
+    }
+
     defaultConfig {
         applicationId = "${escapeKotlin(config.package)}"
         minSdk = 23
         targetSdk = 36
         versionCode = injectedVersionCode.get()
         versionName = injectedVersionName.get()
+        buildConfigField("boolean", "WEB2APK_DEV_TOOLS", "${config.devTools}")
     }
 
     signingConfigs {
@@ -311,8 +341,10 @@ import android.app.Activity
 import android.content.Intent
 import android.graphics.Color
 import android.net.Uri
+import android.util.Log
 import android.os.Bundle
 import android.webkit.CookieManager
+import android.webkit.ConsoleMessage
 import android.webkit.DownloadListener
 import android.webkit.SslErrorHandler
 import android.webkit.WebChromeClient
@@ -340,6 +372,10 @@ class MainActivity : Activity() {
         super.onCreate(savedInstanceState)
         window.statusBarColor = Color.TRANSPARENT
         window.navigationBarColor = Color.TRANSPARENT
+
+        val debugToolsEnabled = BuildConfig.WEB2APK_DEV_TOOLS &&
+            (applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) != 0
+        if (debugToolsEnabled) WebView.setWebContentsDebuggingEnabled(true)
 
         webView = WebView(this)
         webView.setBackgroundColor(Color.WHITE)
@@ -427,6 +463,11 @@ class MainActivity : Activity() {
         }
 
         webView.webChromeClient = object : WebChromeClient() {
+            override fun onConsoleMessage(message: ConsoleMessage): Boolean {
+                Log.d("WebViewConsole", "${message.message()} -- ${message.messageLevel()} -- line ${message.lineNumber()} -- ${message.sourceId()}")
+                return true
+            }
+
             override fun onShowFileChooser(
                 view: WebView,
                 callback: ValueCallback<Array<Uri>>,
@@ -696,16 +737,43 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p dist
-          find app/build/outputs/apk -type f -name "*.apk" -exec cp {} dist/ \;
-          find app/build/outputs/bundle -type f -name "*.aab" -exec cp {} dist/ \;
+          if [[ "${BUILD_TYPE:-both}" == "debug" || "${BUILD_TYPE:-both}" == "both" ]]; then
+            debug_apk=$(find app/build/outputs/apk/debug -type f -name "*.apk" -print -quit)
+            test -n "$debug_apk"
+            cp "$debug_apk" dist/web2apk-debug.apk
+          fi
+          if [[ "${BUILD_TYPE:-both}" == "release" || "${BUILD_TYPE:-both}" == "both" ]]; then
+            release_apk=$(find app/build/outputs/apk/release -type f -name "*.apk" -print -quit)
+            release_aab=$(find app/build/outputs/bundle/release -type f -name "*.aab" -print -quit)
+            test -n "$release_apk"
+            test -n "$release_aab"
+            cp "$release_apk" dist/web2apk-release.apk
+            cp "$release_aab" dist/web2apk-release.aab
+          fi
           test -n "$(find dist -type f -print -quit)"
           for file in dist/*; do sha256sum "$file" | tee "$file.sha256"; done
-      - name: Upload artifacts
+      - name: Upload debug APK
+        if: env.BUILD_TYPE == 'debug' || env.BUILD_TYPE == 'both'
         uses: actions/upload-artifact@v7
         with:
-          name: web2apk-${{ github.run_number }}-${{ github.sha }}
-          path: dist/*
-          if-no-files-found: error
+          path: dist/web2apk-debug.apk
+          archive: false
+          retention-days: 14
+
+      - name: Upload release APK
+        if: env.BUILD_TYPE == 'release' || env.BUILD_TYPE == 'both'
+        uses: actions/upload-artifact@v7
+        with:
+          path: dist/web2apk-release.apk
+          archive: false
+          retention-days: 14
+
+      - name: Upload release AAB
+        if: env.BUILD_TYPE == 'release' || env.BUILD_TYPE == 'both'
+        uses: actions/upload-artifact@v7
+        with:
+          path: dist/web2apk-release.aab
+          archive: false
           retention-days: 14
 `,
     "gradle/wrapper/gradle-wrapper.properties": `distributionBase=GRADLE_USER_HOME
@@ -732,6 +800,7 @@ form?.addEventListener("submit", async (event) => {
     splash: get("splashText"),
     versionName: get("versionName") || "1.0.0",
     versionCode: Number(get("versionCode") || "1"),
+    devTools: form.querySelector("#devTools")?.checked !== false,
     permissions: [...form.querySelectorAll('input[type="checkbox"]:checked')].map((input) => input.value)
   };
 
