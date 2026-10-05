@@ -13,6 +13,15 @@ const githubToken = async () => {
   return session?.provider_token || "";
 };
 
+async function syncBuild(buildId, projectId, repo) {
+  const token = await githubToken();
+  if (!token || !repo) return null;
+  const { data, error } = await client.functions.invoke("github-actions", {
+    body: { action: "sync_build", buildId, projectId, repo, githubToken: token }
+  });
+  return error || !data?.ok ? null : data.build;
+}
+
 async function listArtifacts(buildId, repo, target) {
   const token = await githubToken();
   if (!token) {
@@ -143,7 +152,14 @@ async function init() {
       .eq("project_id", project.id)
       .order("created_at", { ascending: false })
       .limit(5);
-    return [project.id, builds || []];
+    const rows = builds || [];
+    const synced = await Promise.all(rows.map((build) =>
+      project.repo_full_name ? syncBuild(build.id, project.id, project.repo_full_name) : null
+    ));
+    synced.forEach((updated, index) => {
+      if (updated) rows[index] = { ...rows[index], ...updated };
+    });
+    return [project.id, rows];
   }));
   const buildsByProject = new Map(buildResults);
 
