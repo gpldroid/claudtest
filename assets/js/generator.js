@@ -374,7 +374,7 @@ class MainActivity : Activity() {
         window.navigationBarColor = Color.TRANSPARENT
 
         val debugToolsEnabled = BuildConfig.WEB2APK_DEV_TOOLS &&
-            (applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0
+            (applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) != 0
         if (debugToolsEnabled) WebView.setWebContentsDebuggingEnabled(true)
 
         webView = WebView(this)
