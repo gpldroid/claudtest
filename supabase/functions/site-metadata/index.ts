@@ -2,8 +2,13 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { corsHeaders } from "npm:@supabase/supabase-js/cors";
 
-const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), {
-  status, headers: { ...corsHeaders, "Content-Type": "application/json" },
+const ALLOWED_ORIGIN = "https://gpldroid.github.io";
+function corsFor(req: Request) {
+  const origin = req.headers.get("Origin");
+  return origin === ALLOWED_ORIGIN ? { ...corsHeaders, "Access-Control-Allow-Origin": ALLOWED_ORIGIN, Vary: "Origin" } : { ...corsHeaders, "Access-Control-Allow-Origin": ALLOWED_ORIGIN };
+}
+const json = (body: unknown, status = 200, req?: Request) => new Response(JSON.stringify(body), {
+  status, headers: { ...corsFor(req ?? new Request("https://gpldroid.github.io")), "Content-Type": "application/json" },
 });
 const MAX_HTML = 512 * 1024, MAX_ICON = 192 * 1024, MAX_REDIRECTS = 3;
 
@@ -83,7 +88,7 @@ function extractIcon(html: string, base: URL) {
   return candidates.length ? candidates[0].href : "";
 }
 Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+  if (req.method === "OPTIONS") return new Response("ok", { headers: corsFor(req) });
   if (req.method !== "POST") return json({ error: "method_not_allowed" }, 405);
   const auth = req.headers.get("Authorization") || "";
   if (!auth.startsWith("Bearer ")) return json({ error: "unauthorized" }, 401);
