@@ -751,7 +751,7 @@ permissions:
   actions: read
 
 concurrency:
-  group: android-build-${{ github.ref }}
+  group: android-build-\${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -759,9 +759,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 25
     env:
-      BUILD_TYPE: ${{ inputs.build_type }}
-      VERSION_NAME: ${{ inputs.version_name }}
-      VERSION_CODE: ${{ inputs.version_code }}
+      BUILD_TYPE: \${{ inputs.build_type }}
+      VERSION_NAME: \${{ inputs.version_name }}
+      VERSION_CODE: \${{ inputs.version_code }}
     steps:
       - uses: actions/checkout@v4
       - name: Set up JDK 17
@@ -784,17 +784,17 @@ jobs:
       - name: Prepare release signing
         if: env.BUILD_TYPE != "debug"
         env:
-          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
-          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          KEYSTORE_B64: \${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: \${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: \${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: \${{ secrets.ANDROID_KEY_PASSWORD }}
         shell: bash
         run: |
           set -euo pipefail
           if [[ -z "$KEYSTORE_B64" || -z "$KEYSTORE_PASSWORD" || -z "$KEY_ALIAS" || -z "$KEY_PASSWORD" ]]; then echo "Release signing secrets are required for release builds." >&2; exit 1; fi
-          printf "%s" "$KEYSTORE_B64" | base64 --decode > "${{ runner.temp }}/web2apk-release.jks"
-          chmod 600 "${{ runner.temp }}/web2apk-release.jks"
-          echo "ANDROID_KEYSTORE_PATH=${{ runner.temp }}/web2apk-release.jks" >> "$GITHUB_ENV"
+          printf "%s" "$KEYSTORE_B64" | base64 --decode > "\${{ runner.temp }}/web2apk-release.jks"
+          chmod 600 "\${{ runner.temp }}/web2apk-release.jks"
+          echo "ANDROID_KEYSTORE_PATH=\${{ runner.temp }}/web2apk-release.jks" >> "$GITHUB_ENV"
           echo "ANDROID_KEYSTORE_PASSWORD=$KEYSTORE_PASSWORD" >> "$GITHUB_ENV"
           echo "ANDROID_KEY_ALIAS=$KEY_ALIAS" >> "$GITHUB_ENV"
           echo "ANDROID_KEY_PASSWORD=$KEY_PASSWORD" >> "$GITHUB_ENV"
