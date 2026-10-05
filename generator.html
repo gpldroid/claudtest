@@ -18,6 +18,7 @@
   <form id="generatorForm" class="panel grid">
     <label>رابط الموقع
       <input id="siteUrl" type="url" placeholder="https://example.com" required dir="ltr" autocomplete="url">
+      <small id="siteMetadataStatus" class="muted">سيتم تحليل الموقع تلقائياً عند إدخال رابط HTTPS.</small>
     </label>
     <label>اسم التطبيق
       <input id="appName" value="My Website" required maxlength="50">
@@ -30,7 +31,10 @@
       <small id="packageIdHint">سيتم اقتراح معرّف آمن تلقائياً من رابط الموقع واسم التطبيق.</small>
     </label>
     <label>الأيقونة
-      <input id="appIcon" value="🌐">
+      <div class="icon-input-row">
+        <img id="appIconPreview" class="app-icon-preview" alt="أيقونة الموقع المكتشفة" hidden>
+        <input id="appIcon" value="🌐" aria-describedby="siteMetadataStatus">
+      </div>
     </label>
     <label>اللون الأساسي
       <input id="primaryColor" type="color" value="#536dfe">
@@ -62,7 +66,7 @@
     <div class="preview-head">
       <div>
         <h2 id="previewTitle">Web App Viewer</h2>
-        <p class="muted">معاينة آمنة للموقع قبل إنشاء التطبيق. المعاينة تعمل فقط مع HTTPS.</p>
+        <p class="muted">المعاينة المباشرة تعمل للمواقع التي تسمح بالتضمين. إذا منع الموقع iframe، استخدم «فتح الموقع»؛ لن يمنع ذلك إنشاء التطبيق.</p>
       </div>
       <a id="previewOpen" class="btn" href="#" target="_blank" rel="noopener noreferrer">فتح الموقع</a>
     </div>

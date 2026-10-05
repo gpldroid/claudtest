@@ -24,3 +24,21 @@
 }
 
 .web-preview{margin-top:22px}.preview-head{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap}.preview-head h2{margin:0 0 4px}.preview-head p{margin:0}.preview-frame-wrap{position:relative;margin-top:16px;min-height:520px;border:1px solid var(--line);border-radius:14px;overflow:hidden;background:#0b1427}.preview-frame-wrap iframe{display:block;width:100%;height:520px;border:0;background:white}.preview-empty{position:absolute;inset:0;display:grid;place-items:center;padding:30px;text-align:center;color:var(--muted);pointer-events:none}.preview-empty[hidden]{display:none!important}@media(max-width:650px){.preview-frame-wrap,.preview-frame-wrap iframe{min-height:420px;height:420px}}
+
+.icon-input-row{display:flex;align-items:center;gap:10px}
+.app-icon-preview{width:52px;height:52px;object-fit:contain;border-radius:12px;background:#0b1427;border:1px solid var(--line);padding:5px}
+.download-page{max-width:760px}
+.download-hero{text-align:center;padding:44px 24px}
+.download-icon{width:72px;height:72px;margin:0 auto 18px;border-radius:20px;display:grid;place-items:center;font-size:36px;background:#1c2946;border:1px solid var(--line)}
+.download-hero h1{margin:0 0 10px}
+.build-progress{height:9px;background:#0b1427;border-radius:999px;overflow:hidden;margin:24px auto 14px;max-width:520px}
+.build-progress span{display:block;width:10%;height:100%;background:linear-gradient(90deg,#536dfe,#8b5cf6);transition:width .35s ease}
+.download-timer{font-size:14px;color:var(--muted);min-height:24px}
+.download-results{margin-top:18px}
+.download-head{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.download-head h2{margin:0 0 5px}
+.download-buttons{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-top:22px}
+.download-buttons .btn{width:100%}
+.buildControls,.buildRow{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.buildRow{padding:10px 0;border-top:1px solid var(--line)}
+.artifactResults{width:100%}

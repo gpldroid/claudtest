@@ -48,7 +48,8 @@ async function listArtifacts(buildId, repo, target) {
 
   target.innerHTML = data.artifacts.map((artifact) =>
     '<button type="button" class="downloadArtifact" data-build="' + esc(buildId) +
-    '" data-repo="' + esc(repo) + '" data-artifact="' + esc(artifact.id) + '">' +
+    '" data-repo="' + esc(repo) + '" data-artifact="' + esc(artifact.id) +
+    '" data-kind="' + (String(artifact.name).toLowerCase().includes("source") ? "source" : "app") + '">' +
     esc(artifact.name) + "</button>"
   ).join(" ");
 
@@ -57,12 +58,13 @@ async function listArtifacts(buildId, repo, target) {
       button.dataset.build,
       button.dataset.repo,
       button.dataset.artifact,
-      button
+      button,
+      button.dataset.kind
     ));
   });
 }
 
-async function downloadArtifact(buildId, repo, artifactId, button) {
+async function downloadArtifact(buildId, repo, artifactId, button, kind = "app") {
   const token = await githubToken();
   if (!token) {
     button.textContent = "سجّل الدخول عبر GitHub";
@@ -99,10 +101,12 @@ async function downloadArtifact(buildId, repo, artifactId, button) {
     if (!window.JSZip) throw new Error("zip_decoder_unavailable");
 
     const zip = await window.JSZip.loadAsync(archive);
-    const candidates = Object.keys(zip.files).filter((name) => /\.(apk|aab)$/i.test(name) && !zip.files[name].dir);
-    if (!candidates.length) throw new Error("apk_aab_missing");
-
-    const preferred = candidates.find((name) => /web2apk-(debug|release)\.(apk|aab)$/i.test(name)) || candidates[0];
+    const candidates = Object.keys(zip.files).filter((name) => !zip.files[name].dir);
+    const preferred = kind === "source"
+      ? (candidates.find((name) => /web2apk-source\.zip$/i.test(name)) || candidates.find((name) => /\.zip$/i.test(name)))
+      : (candidates.find((name) => /\.(apk|aab)$/i.test(name) && /web2apk-(debug|release)\.(apk|aab)$/i.test(name)) ||
+         candidates.find((name) => /\.(apk|aab)$/i.test(name)));
+    if (!preferred) throw new Error("download_file_missing");
     const file = zip.files[preferred];
     const blob = await file.async("blob");
     const filename = preferred.split("/").pop();
@@ -219,6 +223,7 @@ async function init() {
           '<div class="buildRow">' +
             '<span>Build ' + esc(build.version || build.id.slice(0, 8)) + " · " + esc(build.status) + "</span>" +
             (build.run_url ? '<a class="btn" target="_blank" rel="noopener noreferrer" href="' + esc(build.run_url) + '">GitHub Actions</a>' : "") +
+            '<a class="btn" href="../download.html?build=' + encodeURIComponent(build.id) + '&project=' + encodeURIComponent(p.id) + '">صفحة التحميل</a>' +
             '<button type="button" class="artifactList" data-build="' + esc(build.id) +
               '" data-repo="' + esc(p.repo_full_name || p.repo || "") + '">ملفات البناء</button>' +
             '<div class="artifactResults" id="artifacts-' + esc(build.id) + '"></div>' +
