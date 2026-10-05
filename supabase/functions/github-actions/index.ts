@@ -18,7 +18,7 @@ const json = (body: unknown, status = 200) => new Response(JSON.stringify(body),
 });
 const validRepo = (value: string) => /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(value);
 const validUuid = (value: unknown) => typeof value === "string" && /^[0-9a-fA-F-]{36}$/.test(value);
-const validPath = (value: string) => value.length > 0 && value.length <= 240 && !value.startsWith("/") && !value.includes("\\") && !/[\x00-\x1f]/.test(value);
+const validPath = (value: string) => {    if (value.length === 0 || value.length > 240 || value.startsWith("/") || value.includes("\\") || /[\x00-\x1f]/.test(value)) return false;    const parts = value.split("/");    return parts.every((part) => part.length > 0 && part !== "." && part !== "..");  };
 const base64Utf8 = (value: string) => {
   const bytes = new TextEncoder().encode(value);
   let binary = "";
