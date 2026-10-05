@@ -173,8 +173,8 @@ const previewFrame = document.querySelector("#webAppViewer");
 const previewEmpty = document.querySelector("#previewEmpty");
 const previewOpen = document.querySelector("#previewOpen");
 
-function updateWebAppViewer() {
-  const value = get("siteUrl");
+function updateWebAppViewer(forcedUrl = "") {
+  const value = forcedUrl || get("siteUrl");
   if (!previewFrame || !previewEmpty || !previewOpen) return;
   if (!validUrl(value)) {
     previewFrame.removeAttribute("src");
@@ -838,6 +838,21 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           path: dist/web2apk-release.apk
+          archive: false
+          retention-days: 14
+
+      - name: Create source archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f dist/web2apk-source.zip
+          zip -qr dist/web2apk-source.zip . -x ".git/*" "app/build/*" "build/*" ".gradle/*"
+          test -s dist/web2apk-source.zip
+
+      - name: Upload source code
+        uses: actions/upload-artifact@v7
+        with:
+          path: dist/web2apk-source.zip
           archive: false
           retention-days: 14
 
