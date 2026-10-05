@@ -235,6 +235,11 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.webkit.ValueCallback
 import android.widget.Toast
+import android.widget.FrameLayout
+import android.widget.TextView
+import android.view.Gravity
+import android.os.Handler
+import android.os.Looper
 
 class MainActivity : Activity() {
     private lateinit var webView: WebView
