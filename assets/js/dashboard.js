@@ -219,6 +219,7 @@ async function init() {
           '<div class="buildRow">' +
             '<span>Build ' + esc(build.version || build.id.slice(0, 8)) + " · " + esc(build.status) + "</span>" +
             (build.run_url ? '<a class="btn" target="_blank" rel="noopener noreferrer" href="' + esc(build.run_url) + '">GitHub Actions</a>' : "") +
+            '<a class="btn" href="../download.html?build=' + encodeURIComponent(build.id) + '&project=' + encodeURIComponent(p.id) + '">صفحة التحميل</a>' +
             '<button type="button" class="artifactList" data-build="' + esc(build.id) +
               '" data-repo="' + esc(p.repo_full_name || p.repo || "") + '">ملفات البناء</button>' +
             '<div class="artifactResults" id="artifacts-' + esc(build.id) + '"></div>' +
