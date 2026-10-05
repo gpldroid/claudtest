@@ -1,0 +1,21 @@
+:root{--bg:#080c18;--surface:#10182b;--surface2:#16213a;--line:#283653;--text:#f4f7ff;--muted:#aab6cf;--accent:#6d7cff;--accent2:#9b7cff;--shadow:0 20px 60px rgba(0,0,0,.28)}
+body{background:radial-gradient(circle at 50% -15%,#24376b 0,transparent 42%),var(--bg);color:var(--text)}
+header{position:sticky;top:0;z-index:20;background:rgba(8,12,24,.86);backdrop-filter:blur(16px);border-bottom:1px solid rgba(255,255,255,.08)}
+header nav a{padding:6px 2px}
+.hero h1{letter-spacing:-.045em}
+.btn{transition:transform .15s ease,border-color .15s ease,background .15s ease}
+.btn:hover,button:hover{transform:translateY(-1px);border-color:#52648d}
+.btn:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible,a:focus-visible{outline:3px solid rgba(109,124,255,.5);outline-offset:2px}
+.cards article{transition:transform .18s ease,border-color .18s ease}
+.cards article:hover{transform:translateY(-3px);border-color:#43577f}
+.panel,.cards article{box-shadow:var(--shadow)}
+.legal-page{max-width:850px}
+.legal-page h2{margin-top:34px}
+.site-footer{border-top:1px solid var(--line);padding:28px 5%;margin-top:60px;background:rgba(8,12,24,.45)}
+.footer-inner{width:min(1080px,90%);margin:auto;display:flex;justify-content:space-between;align-items:center;gap:22px;flex-wrap:wrap}
+.footer-inner>div{display:grid;gap:2px}.footer-inner nav{display:flex;gap:18px;flex-wrap:wrap}
+.site-footer>small{display:block;width:min(1080px,90%);margin:18px auto 0}
+.consent-banner{position:fixed;z-index:50;left:18px;right:18px;bottom:18px;max-width:900px;margin:auto;padding:18px 20px;border:1px solid #3b4c70;border-radius:18px;background:rgba(12,19,34,.96);box-shadow:0 20px 70px rgba(0,0,0,.45);backdrop-filter:blur(16px);display:flex;align-items:center;justify-content:space-between;gap:22px}
+.consent-banner p{margin:5px 0;color:var(--muted);font-size:14px}.consent-actions{display:flex;gap:8px;flex-shrink:0}
+.consent-banner a{color:#c8d0ff;text-decoration:underline}
+@media(max-width:700px){.consent-banner{left:12px;right:12px;bottom:12px;flex-direction:column;align-items:stretch}.consent-actions{display:grid;grid-template-columns:1fr 1fr}.footer-inner{align-items:flex-start;flex-direction:column}}
