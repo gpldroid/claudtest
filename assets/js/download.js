@@ -88,7 +88,7 @@ async function listArtifacts(repo) {
   return data.artifacts || [];
 }
 
-async function downloadArtifact(artifact, kind, button) {
+async function downloadArtifact(artifact, kind, button, repo) {
   const token = await githubToken();
   const session = (await client.auth.getSession()).data.session;
   if (!token || !session) {
@@ -110,7 +110,7 @@ async function downloadArtifact(artifact, kind, button) {
         action: "download_artifact",
         buildId,
         artifactId: artifact.id,
-        repo: new URLSearchParams(location.search).get("repo") || undefined,
+        repo,
         githubToken: token
       })
     });
@@ -166,7 +166,7 @@ function renderDownloads(artifacts, context) {
   ).join("");
   buttonsEl.querySelectorAll(".downloadButton").forEach((button, index) => {
     const artifact = byName.get(String(available[index][0]).toLowerCase());
-    button.addEventListener("click", () => downloadArtifact(artifact, available[index][1], button));
+    button.addEventListener("click", () => downloadArtifact(artifact, available[index][1], button, context.project.repo_full_name));
   });
   summaryEl.textContent = context.project.name + " · " + context.project.package + " · " + (context.build.version || "");
   actionsLink.href = context.build.run_url || "#";
