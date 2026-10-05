@@ -107,11 +107,18 @@ packageInput?.addEventListener("input", () => {
   if (packageHint) packageHint.textContent = "معرّف مخصص. اضغط «توليد تلقائياً» للعودة إلى الاقتراح الذكي.";
 });
 document.querySelector("#siteUrl")?.addEventListener("input", () => updateGeneratedPackageId());
+document.querySelector("#siteUrl")?.addEventListener("change", () => updateGeneratedPackageId());
+document.querySelector("#siteUrl")?.addEventListener("blur", () => updateGeneratedPackageId());
 document.querySelector("#appName")?.addEventListener("input", () => updateGeneratedPackageId());
-packageAutoButton?.addEventListener("click", () => {
+document.querySelector("#appName")?.addEventListener("change", () => updateGeneratedPackageId());
+document.querySelector("#appName")?.addEventListener("blur", () => updateGeneratedPackageId());
+packageAutoButton?.addEventListener("click", (event) => {
+  event.preventDefault();
   packageManuallyEdited = false;
   updateGeneratedPackageId(true);
 });
+
+updateGeneratedPackageId();
 
 const safePermissionNames = new Set([
   "CAMERA",
