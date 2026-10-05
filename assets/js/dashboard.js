@@ -113,6 +113,31 @@ async function downloadArtifact(buildId, repo, artifactId, button) {
   }
 }
 
+async function startBuild(projectId, repo, buildType, button) {
+  const token = await githubToken();
+  if (!token) {
+    button.textContent = "سجّل الدخول عبر GitHub";
+    return;
+  }
+  const original = button.textContent;
+  button.disabled = true;
+  button.textContent = "جارٍ البدء…";
+  try {
+    const { data, error } = await client.functions.invoke("github-actions", {
+      body: { action: "start_build", projectId, repo, githubToken: token, buildType }
+    });
+    if (error || !data?.ok) throw new Error("build_failed");
+    button.textContent = "بدأ البناء";
+    setTimeout(() => { button.textContent = original; }, 2500);
+    setTimeout(() => init(), 1200);
+  } catch {
+    button.textContent = "تعذر البدء";
+    setTimeout(() => { button.textContent = original; }, 2500);
+  } finally {
+    button.disabled = false;
+  }
+}
+
 async function init() {
   const { data: { user } } = await client.auth.getUser();
   if (!user) {
@@ -165,22 +190,38 @@ async function init() {
 
   list.innerHTML = rows.map((p) => {
     const builds = buildsByProject.get(p.id) || [];
-    const buildHtml = builds.length
+    const buildHtml = (p.repo_full_name
+      ? '<div class="buildControls">' +
+          '<button type="button" class="startBuild" data-project="' + esc(p.id) + '" data-repo="' + esc(p.repo_full_name) + '" data-type="debug">APK تجريبي</button>' +
+          '<button type="button" class="startBuild" data-project="' + esc(p.id) + '" data-repo="' + esc(p.repo_full_name) + '" data-type="release">APK/AAB إصدار</button>' +
+        "</div>"
+      : "") +
+      (builds.length
       ? '<div class="builds">' + builds.map((build) =>
           '<div class="buildRow">' +
             '<span>Build ' + esc(build.version || build.id.slice(0, 8)) + " · " + esc(build.status) + "</span>" +
+            (build.run_url ? '<a class="btn" target="_blank" rel="noopener noreferrer" href="' + esc(build.run_url) + '">GitHub Actions</a>' : "") +
             '<button type="button" class="artifactList" data-build="' + esc(build.id) +
               '" data-repo="' + esc(p.repo_full_name || p.repo || "") + '">ملفات البناء</button>' +
             '<div class="artifactResults" id="artifacts-' + esc(build.id) + '"></div>' +
           "</div>"
         ).join("") + "</div>"
-      : "<p>لا توجد عمليات بناء مسجلة بعد.</p>";
+      : "<p>لا توجد عمليات بناء مسجلة بعد.</p>");
 
     return '<article><h3>' + esc(p.name) + "</h3>" +
       "<p>" + esc(p.url) + " · " + esc(p.package) + "</p>" +
       "<small>" + esc(p.status) + "</small>" +
       buildHtml + "</article>";
   }).join("");
+
+  list.querySelectorAll(".startBuild").forEach((button) => {
+    button.addEventListener("click", () => startBuild(
+      button.dataset.project,
+      button.dataset.repo,
+      button.dataset.type,
+      button
+    ));
+  });
 
   list.querySelectorAll(".artifactList").forEach((button) => {
     button.addEventListener("click", () => {
