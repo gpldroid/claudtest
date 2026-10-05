@@ -62,7 +62,7 @@ form?.addEventListener("submit", async (event) => {
   const { data, error } = await client.functions.invoke("github-actions", {
     body: {
       action: "set_secrets",
-      repo,
+      projectId,
       githubToken: token,
       secrets: {
         ANDROID_KEYSTORE_BASE64: base64.replace(/\s/g, ""),
@@ -77,10 +77,10 @@ form?.addEventListener("submit", async (event) => {
   document.querySelector("#keyAlias").value = "";
   document.querySelector("#keyPassword").value = "";
   if (error || !data?.ok) {
-    message.textContent = "تعذر حفظ أسرار التوقيع في GitHub.";
+    message.textContent = "تعذر حفظ أسرار التوقيع في GitHub. لم يتم الاحتفاظ بالقيم داخل Web2APK، وقد تحتاج إلى إعادة المحاولة.";
     return;
   }
-  message.textContent = "تم حفظ أسرار التوقيع في GitHub Actions. لم يتم تخزينها في Web2APK.";
+  message.textContent = "تم حفظ أسرار التوقيع في GitHub Repository Secrets. القيم لا تُعرض أو تُحفظ داخل Web2APK.";
 });
 
 document.querySelector("#signOut")?.addEventListener("click", async () => {
