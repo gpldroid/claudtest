@@ -35,7 +35,7 @@
       result ^= char.codePointAt(0);
       result = Math.imul(result, 16777619);
     }
-    return (result >>> 0).toString(36).padStart(7, "0").slice(0, 7);
+    return "h" + (result >>> 0).toString(36).padStart(6, "0").slice(0, 6);
   };
 
   const generatePackage = () => {
