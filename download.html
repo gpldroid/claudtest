@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>تحميل التطبيق — Web2APK</title>
+<link rel="stylesheet" href="assets/css/style.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+</head>
+<body>
+<header>
+  <a class="brand" href="index.html">◈ Web2APK</a>
+  <nav><a href="index.html">الرئيسية</a><a href="dashboard/">لوحة التحكم</a></nav>
+</header>
+<main class="wrap download-page">
+  <section class="panel download-hero">
+    <div class="download-icon" aria-hidden="true">↓</div>
+    <h1>تطبيقك قيد التجهيز</h1>
+    <p id="downloadStatus" class="muted" role="status" aria-live="polite">جارٍ التحقق من حالة البناء…</p>
+    <div class="build-progress" aria-hidden="true"><span id="buildProgress"></span></div>
+    <div id="downloadTimer" class="download-timer">سيتم التحقق خلال 8 ثوانٍ</div>
+  </section>
+
+  <section id="downloadResults" class="panel download-results hidden" aria-labelledby="downloadTitle">
+    <div class="download-head">
+      <div>
+        <h2 id="downloadTitle">الملفات الجاهزة</h2>
+        <p id="downloadSummary" class="muted">يمكنك تنزيل الملفات من هنا.</p>
+      </div>
+      <a id="actionsLink" class="btn" href="#" target="_blank" rel="noopener noreferrer">GitHub Actions</a>
+    </div>
+    <div id="downloadButtons" class="download-buttons"></div>
+  </section>
+
+  <section id="downloadError" class="panel hidden" aria-live="polite">
+    <h2>تعذر إكمال البناء</h2>
+    <p id="downloadErrorText" class="muted"></p>
+    <a id="errorActionsLink" class="btn" href="#" target="_blank" rel="noopener noreferrer">فتح GitHub Actions</a>
+  </section>
+</main>
+<script type="module" src="assets/js/download.js"></script>
+</body>
+</html>
