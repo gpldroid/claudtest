@@ -731,7 +731,10 @@ form?.addEventListener("submit", async (event) => {
   }).select("id").single();
 
   if (projectError || !project) {
-    message.textContent = "تعذر حفظ المشروع في قاعدة البيانات.";
+    const detail = projectError?.message || "";
+    message.textContent = detail.includes("PROJECT_QUOTA_EXCEEDED")
+      ? "وصلت إلى الحد المجاني: 10 مشاريع."
+      : "تعذر حفظ المشروع في قاعدة البيانات.";
     return;
   }
 
@@ -750,7 +753,12 @@ form?.addEventListener("submit", async (event) => {
   });
 
   if (provisionError || !provision?.ok) {
-    message.textContent = "تعذر إنشاء مستودع GitHub أو بدء عملية البناء.";
+    const code = provision?.error || "";
+    message.textContent = code === "build_daily_quota_exceeded"
+      ? "وصلت إلى حد البناء المجاني اليومي: 10 عمليات."
+      : code === "project_quota_exceeded"
+        ? "وصلت إلى الحد المجاني: 10 مشاريع."
+        : "تعذر إنشاء مستودع GitHub أو بدء عملية البناء.";
     return;
   }
 
