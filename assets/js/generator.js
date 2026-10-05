@@ -120,6 +120,31 @@ packageAutoButton?.addEventListener("click", (event) => {
 
 updateGeneratedPackageId();
 
+const previewFrame = document.querySelector("#webAppViewer");
+const previewEmpty = document.querySelector("#previewEmpty");
+const previewOpen = document.querySelector("#previewOpen");
+
+function updateWebAppViewer() {
+  const value = get("siteUrl");
+  if (!previewFrame || !previewEmpty || !previewOpen) return;
+  if (!validUrl(value)) {
+    previewFrame.removeAttribute("src");
+    previewEmpty.hidden = false;
+    previewOpen.href = "#";
+    previewOpen.setAttribute("aria-disabled", "true");
+    return;
+  }
+  previewFrame.src = value;
+  previewEmpty.hidden = true;
+  previewOpen.href = value;
+  previewOpen.removeAttribute("aria-disabled");
+}
+
+document.querySelector("#siteUrl")?.addEventListener("input", updateWebAppViewer);
+document.querySelector("#siteUrl")?.addEventListener("change", updateWebAppViewer);
+document.querySelector("#siteUrl")?.addEventListener("blur", updateWebAppViewer);
+updateWebAppViewer();
+
 const safePermissionNames = new Set([
   "CAMERA",
   "ACCESS_FINE_LOCATION",
