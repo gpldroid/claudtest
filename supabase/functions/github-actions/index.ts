@@ -133,7 +133,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    if (!body.artifactId || !/^\\d+$/.test(String(body.artifactId))) {
+    if (!body.artifactId || !/^\d+$/.test(String(body.artifactId))) {
       return json({ error: "invalid_artifact_id" }, 400);
     }
     const artifactId = Number(body.artifactId);
