@@ -89,6 +89,15 @@ const validUrl = (value) => {
   }
 };
 
+const siteUrlInput = document.querySelector("#siteUrl");
+const appNameInput = document.querySelector("#appName");
+const appIconInput = document.querySelector("#appIcon");
+const metadataStatus = document.querySelector("#siteMetadataStatus");
+const appIconPreview = document.querySelector("#appIconPreview");
+let detectedIconDataUrl = "";
+let appNameManuallyEdited = false;
+let metadataTimer = null;
+
 const packageInput = document.querySelector("#packageId");
 const packageAutoButton = document.querySelector("#generatePackageId");
 const packageHint = document.querySelector("#packageIdHint");
@@ -106,12 +115,24 @@ packageInput?.addEventListener("input", () => {
   packageManuallyEdited = true;
   if (packageHint) packageHint.textContent = "معرّف مخصص. اضغط «توليد تلقائياً» للعودة إلى الاقتراح الذكي.";
 });
-document.querySelector("#siteUrl")?.addEventListener("input", () => updateGeneratedPackageId());
+siteUrlInput?.addEventListener("input", () => {
+  updateGeneratedPackageId();
+  updateWebAppViewer();
+  clearTimeout(metadataTimer);
+  if (validUrl(get("siteUrl"))) metadataTimer = setTimeout(analyzeSite, 700);
+});
 document.querySelector("#siteUrl")?.addEventListener("change", () => updateGeneratedPackageId());
 document.querySelector("#siteUrl")?.addEventListener("blur", () => updateGeneratedPackageId());
-document.querySelector("#appName")?.addEventListener("input", () => updateGeneratedPackageId());
-document.querySelector("#appName")?.addEventListener("change", () => updateGeneratedPackageId());
-document.querySelector("#appName")?.addEventListener("blur", () => updateGeneratedPackageId());
+appNameInput?.addEventListener("input", () => {
+  appNameManuallyEdited = true;
+  updateGeneratedPackageId();
+});
+appNameInput?.addEventListener("change", () => updateGeneratedPackageId());
+appNameInput?.addEventListener("blur", () => updateGeneratedPackageId());
+siteUrlInput?.addEventListener("change", analyzeSite);
+siteUrlInput?.addEventListener("blur", () => {
+  if (validUrl(get("siteUrl"))) analyzeSite();
+});
 packageAutoButton?.addEventListener("click", (event) => {
   event.preventDefault();
   packageManuallyEdited = false;
@@ -119,6 +140,34 @@ packageAutoButton?.addEventListener("click", (event) => {
 });
 
 updateGeneratedPackageId();
+
+async function analyzeSite() {
+  const url = get("siteUrl");
+  if (!validUrl(url)) return;
+  if (metadataStatus) metadataStatus.textContent = "جارٍ تحليل الموقع واكتشاف الاسم والأيقونة…";
+  try {
+    const { data, error } = await client.functions.invoke("site-metadata", { body: { url } });
+    if (error || !data?.ok) throw new Error(data?.error || "metadata_failed");
+    if (!appNameManuallyEdited && data.name) appNameInput.value = data.name.slice(0, 50);
+    detectedIconDataUrl = typeof data.iconDataUrl === "string" ? data.iconDataUrl : "";
+    if (appIconPreview) {
+      appIconPreview.hidden = !detectedIconDataUrl;
+      if (detectedIconDataUrl) appIconPreview.src = detectedIconDataUrl;
+    }
+    if (appIconInput) {
+      appIconInput.value = data.iconUrl || "🌐";
+      appIconInput.title = data.iconUrl ? "تم اكتشاف أيقونة الموقع تلقائياً." : "";
+    }
+    updateGeneratedPackageId();
+    updateWebAppViewer(data.finalUrl || url);
+    if (metadataStatus) metadataStatus.textContent = data.iconUrl
+      ? "تم اكتشاف اسم الموقع والأيقونة ومعرّف الحزمة تلقائياً."
+      : "تم اكتشاف اسم الموقع ومعرّف الحزمة. لم تُكتشف أيقونة.";
+  } catch {
+    if (metadataStatus) metadataStatus.textContent = "تعذر تحليل الموقع تلقائياً؛ يمكنك إكمال البيانات يدوياً.";
+    updateGeneratedPackageId();
+  }
+}
 
 const previewFrame = document.querySelector("#webAppViewer");
 const previewEmpty = document.querySelector("#previewEmpty");
@@ -180,6 +229,30 @@ async function canvasPng(size, text, background, foreground) {
 
   const dataUrl = canvas.toDataURL("image/png");
   return dataUrl.split(",")[1];
+}
+
+async function canvasPngFromDataUrl(size, dataUrl, background) {
+  const image = new Image();
+  image.decoding = "async";
+  await new Promise((resolve, reject) => {
+    image.onload = resolve;
+    image.onerror = reject;
+    image.src = dataUrl;
+  });
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d");
+  if (background) {
+    ctx.fillStyle = background;
+    ctx.fillRect(0, 0, size, size);
+  }
+  const padding = Math.round(size * 0.08);
+  const scale = Math.min((size - padding * 2) / image.naturalWidth, (size - padding * 2) / image.naturalHeight);
+  const width = Math.max(1, Math.round(image.naturalWidth * scale));
+  const height = Math.max(1, Math.round(image.naturalHeight * scale));
+  ctx.drawImage(image, Math.round((size - width) / 2), Math.round((size - height) / 2), width, height);
+  return canvas.toDataURL("image/png").split(",")[1];
 }
 
 function iconLetter(iconValue, appName) {
@@ -843,14 +916,31 @@ form?.addEventListener("submit", async (event) => {
 
   const rgb = hexToRgb(config.primary);
   const letter = iconLetter(config.icon, config.name);
-  const iconPngs = {
-    foreground: await canvasPng(432, letter, null, "#ffffff"),
-    mdpi: await canvasPng(48, letter, config.primary, "#ffffff"),
-    hdpi: await canvasPng(72, letter, config.primary, "#ffffff"),
-    xhdpi: await canvasPng(96, letter, config.primary, "#ffffff"),
-    xxhdpi: await canvasPng(144, letter, config.primary, "#ffffff"),
-    xxxhdpi: await canvasPng(192, letter, config.primary, "#ffffff")
-  };
+  let iconPngs;
+  if (detectedIconDataUrl) {
+    try {
+      iconPngs = {
+        foreground: await canvasPngFromDataUrl(432, detectedIconDataUrl, null),
+        mdpi: await canvasPngFromDataUrl(48, detectedIconDataUrl, config.primary),
+        hdpi: await canvasPngFromDataUrl(72, detectedIconDataUrl, config.primary),
+        xhdpi: await canvasPngFromDataUrl(96, detectedIconDataUrl, config.primary),
+        xxhdpi: await canvasPngFromDataUrl(144, detectedIconDataUrl, config.primary),
+        xxxhdpi: await canvasPngFromDataUrl(192, detectedIconDataUrl, config.primary)
+      };
+    } catch {
+      detectedIconDataUrl = "";
+    }
+  }
+  if (!iconPngs) {
+    iconPngs = {
+      foreground: await canvasPng(432, letter, null, "#ffffff"),
+      mdpi: await canvasPng(48, letter, config.primary, "#ffffff"),
+      hdpi: await canvasPng(72, letter, config.primary, "#ffffff"),
+      xhdpi: await canvasPng(96, letter, config.primary, "#ffffff"),
+      xxhdpi: await canvasPng(144, letter, config.primary, "#ffffff"),
+      xxxhdpi: await canvasPng(192, letter, config.primary, "#ffffff")
+    };
+  }
 
   const files = buildFiles(config, iconPngs);
   const zip = new JSZip();
@@ -920,6 +1010,5 @@ form?.addEventListener("submit", async (event) => {
     return;
   }
 
-  message.textContent = "تم إنشاء مستودع GitHub وبدء بناء APK تجريبي. يمكنك متابعة الحالة من لوحة التحكم.";
-
+  window.location.href = "download.html?build=" + encodeURIComponent(provision.buildId) + "&project=" + encodeURIComponent(provision.projectId);
 });
