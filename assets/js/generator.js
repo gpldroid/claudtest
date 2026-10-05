@@ -26,7 +26,7 @@ const validPackage = (value) =>
 function packageSegment(value) {
   return String(value ?? "")
     .normalize("NFKD")
-    .replace(/[\\u0300-\\u036f]/g, "")
+    .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
     .replace(/[^a-z0-9_]+/g, "")
     .replace(/^[^a-z]+/, "")
