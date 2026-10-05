@@ -13,6 +13,7 @@ const actionsLink = document.querySelector("#actionsLink");
 const errorEl = document.querySelector("#downloadError");
 const errorText = document.querySelector("#downloadErrorText");
 const errorActionsLink = document.querySelector("#errorActionsLink");
+const githubReconnectLink = document.querySelector("#githubReconnectLink");
 
 const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (c) => ({
   "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
@@ -24,7 +25,7 @@ function setProgress(value) {
   if (progressEl) progressEl.style.width = Math.max(0, Math.min(100, value)) + "%";
 }
 
-function showError(text, runUrl = "") {
+function showError(text, runUrl = "", reconnect = false) {
   if (statusEl) statusEl.textContent = "توقف البناء أو حدث خطأ.";
   if (timerEl) timerEl.textContent = "";
   if (progressEl) progressEl.style.width = "0%";
@@ -35,6 +36,13 @@ function showError(text, runUrl = "") {
     errorActionsLink.classList.remove("hidden");
   } else {
     errorActionsLink.classList.add("hidden");
+  }
+  if (reconnect && githubReconnectLink) {
+    const next = encodeURIComponent("download.html?build=" + buildId + "&project=" + projectId);
+    githubReconnectLink.href = "login.html?next=" + next;
+    githubReconnectLink.classList.remove("hidden");
+  } else if (githubReconnectLink) {
+    githubReconnectLink.classList.add("hidden");
   }
 }
 
@@ -208,7 +216,7 @@ async function poll() {
   } catch (error) {
     if (error?.message === "github_session_required") {
       clearInterval(polling);
-      showError("يجب تسجيل الدخول عبر GitHub حتى يمكن الوصول إلى ملفات البناء.");
+      showError("انتهت جلسة GitHub أو لم تعد صلاحية GitHub متاحة في الذاكرة. أعد ربط GitHub ثم ستعود تلقائياً إلى صفحة التحميل.", "", true);
       return;
     }
     if (statusEl) statusEl.textContent = "جارٍ إعادة المحاولة…";
