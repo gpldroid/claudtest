@@ -304,7 +304,7 @@ returns trigger
 language plpgsql
 security definer
 set search_path = ''
-as $
+as $func$
 begin
   if new.plan <> old.plan
      or new.max_projects <> old.max_projects
@@ -313,7 +313,7 @@ begin
   end if;
   return new;
 end;
-$;
+$func$;
 
 drop trigger if exists profiles_protect_limits on public.profiles;
 create trigger profiles_protect_limits
