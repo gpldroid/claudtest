@@ -1,1 +1,33 @@
-<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>الإعدادات — Web2APK</title><link rel="stylesheet" href="../assets/css/style.css"><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script></head><body><header><a class="brand" href="../index.html">◈ Web2APK</a><nav><a href="index.html">الرئيسية</a><a href="projects.html">المشاريع</a></nav></header><main class="narrow panel"><h1>إعدادات الحساب</h1><p>Supabase متصل بالمشروع hponoukkcegkwddenfqd.</p><p class="muted">لا تضع مفاتيح service_role أو الأسرار في المتصفح.</p><button id="signOut" class="btn">تسجيل الخروج</button><p id="settingsMessage"></p></main><script type="module" src="../assets/js/dashboard.js"></script></body></html>
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>الإعدادات — Web2APK</title>
+<link rel="stylesheet" href="../assets/css/style.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+<header><a class="brand" href="../index.html">◈ Web2APK</a><nav><a href="index.html">الرئيسية</a><a href="projects.html">المشاريع</a></nav></header>
+<main class="narrow panel">
+<h1>إعدادات الحساب</h1>
+<p class="muted">إعداد توقيع APK/AAB يتم عبر GitHub Actions. الأسرار لا تُحفظ في Web2APK أو قاعدة البيانات.</p>
+<form id="signingForm">
+<label>المشروع
+<select id="projectSelect" required><option>جارٍ التحميل…</option></select>
+</label>
+<label>Keystore بصيغة Base64
+<textarea id="keystoreBase64" rows="5" required autocomplete="off"></textarea>
+</label>
+<label>كلمة مرور keystore
+<input id="storePassword" type="password" required autocomplete="new-password"></label>
+<label>Alias
+<input id="keyAlias" required autocomplete="off"></label>
+<label>كلمة مرور المفتاح
+<input id="keyPassword" type="password" required autocomplete="new-password"></label>
+<button class="btn primary" type="submit">حفظ أسرار التوقيع</button>
+</form>
+<p id="settingsMessage" role="status"></p>
+<button id="signOut" class="btn">تسجيل الخروج</button>
+</main>
+<script type="module" src="../assets/js/settings.js"></script>
+</body></html>
