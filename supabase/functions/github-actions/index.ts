@@ -133,6 +133,64 @@ Deno.serve(async (req) => {
   const repoCheck = await fetch(`https://api.github.com/repos/${owner}/${repo}`, { headers: ghHeaders });
   if (!repoCheck.ok) return json({ error: "github_repo_access_denied" }, repoCheck.status === 404 ? 404 : 403);
 
+  if (body.action === "start_build") {
+    if (!validUuid(body.projectId) || !body.repo || !validRepo(body.repo)) {
+      return json({ error: "invalid_build_request" }, 400);
+    }
+    const buildType = body.buildType || "debug";
+    if (!["debug", "release", "both"].includes(buildType)) return json({ error: "invalid_build_type" }, 400);
+    const versionName = body.versionName || "1.0.0";
+    const versionCode = Number(body.versionCode || 1);
+    if (!/^\\d+\\.\\d+\\.\\d+(?:[-+][0-9A-Za-z.-]+)?$/.test(versionName) || versionName.length > 30) {
+      return json({ error: "invalid_version_name" }, 400);
+    }
+    if (!Number.isInteger(versionCode) || versionCode < 1 || versionCode > 2100000000) {
+      return json({ error: "invalid_version_code" }, 400);
+    }
+    const { data: project, error: projectError } = await supabase.from("projects")
+      .select("id,repo_full_name,version_name,version_code").eq("id", body.projectId).maybeSingle();
+    if (projectError || !project || project.repo_full_name !== body.repo) {
+      return json({ error: "project_access_denied" }, 403);
+    }
+    const { data: build, error: buildError } = await supabaseAdmin.from("builds").insert({
+      project_id: project.id,
+      status: "queued",
+      version: versionName + " (" + versionCode + ")",
+    }).select("id").single();
+    if (buildError || !build) return json({ error: "build_create_failed" }, 500);
+    const dispatchResponse = await fetch(
+      "https://api.github.com/repos/" + owner + "/" + repo + "/actions/workflows/android-build.yml/dispatches?return_run_details=true",
+      {
+        method: "POST",
+        headers: ghHeaders,
+        body: JSON.stringify({
+          ref: "main",
+          inputs: { build_type: buildType, version_name: versionName, version_code: String(versionCode) },
+        }),
+      },
+    );
+    if (!dispatchResponse.ok) {
+      await supabaseAdmin.from("builds").update({
+        status: "failed", conclusion: "dispatch_failed", finished_at: new Date().toISOString(),
+      }).eq("id", build.id);
+      return json({ error: "github_dispatch_failed" }, dispatchResponse.status);
+    }
+    const dispatch = await dispatchResponse.json();
+    const buildUpdate = await supabaseAdmin.from("builds").update({
+      run_id: dispatch.workflow_run_id || null,
+      run_url: dispatch.html_url || dispatch.run_url || null,
+    }).eq("id", build.id);
+    if (buildUpdate.error) return json({ error: "build_update_failed" }, 500);
+    await supabaseAdmin.from("projects").update({ status: "building" }).eq("id", project.id);
+    return json({
+      ok: true,
+      action: "start_build",
+      buildId: build.id,
+      runId: dispatch.workflow_run_id || null,
+      runUrl: dispatch.html_url || dispatch.run_url || null,
+    });
+  }
+
   if (body.action === "set_secrets") {
     const entries = Object.entries(body.secrets ?? {});
     if (!entries.length || entries.length > 4) return json({ error: "invalid_secret_count" }, 400);
